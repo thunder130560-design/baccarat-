@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anime Casino Dashboard</title>
+    <script src="baccarat_engine.js"></script>
+    <style>
+        body { background-color: #053b13; color: white; font-family: 'Arial', sans-serif; margin: 0; padding: 6px; text-align: center; user-select: none; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 8px; margin-bottom: 6px; font-size: 12px; }
+        .timer-badge { background: #d81b60; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+        .dealer-box { position: relative; background: radial-gradient(circle, #0e722b 0%, #03240b 100%); border-radius: 12px; padding: 10px; border: 2px solid #ffd700; }
+        .anime-face { width: 70px; height: 70px; background: #fff0e0; border-radius: 50%; margin: 0 auto 5px auto; position: relative; border: 2px solid #ffb74d; }
+        .hair-top { position: absolute; top: -4px; left: -4px; width: 78px; height: 40px; background: #6a1b9a; border-radius: 40px 40px 0 0; }
+        .eyes-wrap { display: flex; justify-content: space-between; width: 38px; position: absolute; top: 28px; left: 16px; }
+        .eye-ball { width: 10px; height: 14px; background: #283593; border-radius: 50%; border-top: 2px solid #000; }
+        .mouth-line { width: 10px; height: 5px; background: #900c3f; border-radius: 0 0 10px 10px; position: absolute; top: 48px; left: 30px; }
+        .shuffling .eye-ball { height: 3px; border-radius: 0; background: #000; margin-top: 5px; }
+        .win .eye-ball { height: 8px; width: 12px; background: transparent; border-top: 3px solid #283593; border-radius: 50% 50% 0 0; }
+        .win .mouth-line { width: 14px; height: 8px; border-radius: 0 0 14px 14px; background: #d81b60; }
+        .felt-layout { display: flex; justify-content: center; gap: 10px; margin-top: 5px; }
+        .felt-zone { background: rgba(0,0,0,0.3); padding: 6px; border-radius: 6px; width: 145px; }
+        .cards-flex { display: flex; gap: 4px; height: 55px; justify-content: center; align-items: center; min-height: 55px; }
+        .card { background: white; color: black; width: 36px; height: 52px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; transform: rotateY(90deg); transition: transform 0.3s; }
+        .card.flipped { transform: rotateY(0deg); }
+        .red { color: #d11a2a; }
+        .boards-flex { display: flex; justify-content: center; gap: 6px; margin: 6px 0; }
+        .board-card { background: white; color: black; padding: 4px; border-radius: 6px; }
+        .board-lbl { font-size: 8px; font-weight: bold; text-align: left; color: #444; margin-bottom: 2px; }
+        canvas { display: block; background: #fff; }
+        .bet-matrix { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 0 auto; max-width: 360px; }
+        .bet-node { background: rgba(0,0,0,0.4); border: 1px solid #ffd700; border-radius: 6px; padding: 6px 2px; cursor: pointer; position: relative; }
+        .chip-counter { position: absolute; top: -5px; right: -5px; background: #d81b60; color: white; font-size: 9px; padding: 1px 5px; border-radius: 10px; border: 1px solid white; display: none; }
+        .chip-tray { display: flex; justify-content: center; gap: 8px; margin: 8px auto; max-width: 360px; }
+        .chip { width: 36px; height: 36px; border-radius: 50%; border: 2px dashed white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; background: #0088cc; cursor: pointer; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
+        .chip.active { border: 2px solid #ffd700; transform: scale(1.1); box-shadow: 0 0 6px #ffd700; }
+        .dock-panel { display: flex; justify-content: space-between; align-items: center; max-width: 360px; margin: 6px auto; background: rgba(0,0,0,0.3); padding: 6px 12px; border-radius: 20px; }
+        .action-btn { background: #4caf50; border: none; padding: 4px 10px; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; }
+        .hist-view { background: rgba(0,0,0,0.5); border-radius: 6px; padding: 4px; max-width: 360px; margin: 4px auto; font-size: 10px; text-align: left; max-height: 50px; overflow-y: auto; }
+        
+        .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; z-index:999; }
+        .cut-box { background:#0b531e; padding:20px; border-radius:10px; border:2px solid #ffd700; text-align:center; }
+        .deck-strip { display:flex; gap:3px; margin:15px 0; justify-content:center; }
+        .slice-card { width:15px; height:40px; background:#b71c1c; border:1px solid #fff; cursor:pointer; border-radius:2px; }
+        .slice-card:hover { transform: translateY(-4px); border-color:#ffd700; }
+    </style>
+</head>
+<body>
+
+    <div class="header-bar">
+        <div>⏳ Auto-Deal: <span class="timer-badge" id="clock-sec">15</span>s</div>
+        <div id="shoe-lbl" style="color:#ffeb3b; font-weight:bold;">Shoe Round: 0 / 60</div>
+    </div>
+
+    <div class="dealer-box">
+        <div class="anime-face" id="visualFace">
+            <div class="hair-top"></div>
+            <div class="eyes-wrap"><div class="eye-ball"></div><div class="eye-ball"></div></div>
+            <div class="mouth-line"></div>
+        </div>
+        <div id="table-status" style="font-size: 12px; color: #ffd700; font-weight: bold;">💎 INTRODUCING NEW SHOE 💎</div>
+        <div class="felt-layout">
+            <div class="felt-zone">
+                <div style="font-size:10px; color:#4da6ff; font-weight:bold;">PLAYER (<span id="p-point">0</span>)</div>
+                <div class="cards-flex" id="p-row"></div>
+            </div>
+            <div class="felt-zone">
+                <div style="font-size:10px; color:#ff4d4d; font-weight:bold;">BANKER (<span id="b-point">0</span>)</div>
+                <div class="cards-flex" id="b-row"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="boards-flex">
+        <div class="board-card"><div class="board-lbl">🔴 BEAD PLATE MAP</div><canvas id="canvasBead" width="160" height="70"></canvas></div>
+        <div class="board-card"><div class="board-lbl">📊 BIG ROAD ANALYSIS</div><canvas id="canvasBig" width="180" height="70"></canvas></div>
+    </div>
+
+    <div class="bet-matrix">
+        <div class="bet-node" onclick="addBet('PLAYER')"><div class="chip-counter" id="lbl-PLAYER">0</div><div class="node-lbl" style="color:#4da6ff;">PLAYER</div><div class="node-payout">1 : 1</div></div>
+        <div class="bet-node" onclick="addBet('TIE')"><div class="chip-counter" id="lbl-TIE">0</div><div class="node-lbl" style="color:#4caf50;">TIE</div><div class="node-payout">8 : 1</div></div>
+        <div class="bet-node" onclick="addBet('BANKER')"><div class="chip-counter" id="lbl-BANKER">0</div><div class="node-lbl" style="color:#ff4d4d;">BANKER</div><div class="node-payout">1 : 0.95*</div></div>
+        <div class="bet-node" onclick="addBet('P_PAIR')"><div class="chip-counter" id="lbl-P_PAIR">0</div><div class="node-lbl" style="color:#4da6ff;">PLAYER PAIR</div><div class="node-payout">11 : 1</div></div>
+        <div class="bet-node" onclick="addBet('SUPER6')"><div class="chip-counter" id="lbl-SUPER6">0</div><div class="node-lbl" style="color:#ff9100;">SUPER 6</div><div class="node-payout">12x / 20x</div></div>
+        <div class="bet-node" onclick="addBet('B_PAIR')"><div class="chip-counter" id="lbl-B_PAIR">0</div><div class="node-lbl" style="color:#ff4d4d;">BANKER PAIR</div><div class="node-payout">11 : 1</div></div>
+        <div class="bet-node" onclick="addBet('PANDA8')" style="grid-column: span 3; border-color:#ffeb3b;"><div class="chip-counter" id="lbl-PANDA8">0</div><div class="node-lbl" style="color:#ffeb3b;">🐼 PANDA 8 (3-CARD 8 WIN)</div><div class="node-payout">25 : 1</div></div>
+    </div>
+
+    <div class="chip-tray">
+        <div class="chip active" style="background:#4caf50;" onclick="selectChip(5, this)">$5</div>
+        <div class="chip" style="background:#0088cc;" onclick="selectChip(10, this)">$10</div>
+        <div class="chip" style="background:#e65100;" onclick="selectChip(50, this)">$50</div>
+        <div class="chip" style="background:#9c27b0;" onclick="selectChip(100, this)">$100</div>
+        <div class="chip" style="background:#d11a2a;" onclick="selectChip(500, this)">$500</div>
+    </div>
+
+    <div class="dock-panel">
+        <div style="font-size:12px; color:#ffeb3b; font-weight:bold;">💰 <span id="user-bal">20000</span> USDT</div>
+        <div>
+            <button class="action-btn" onclick="applyRebet()">Rebet</button>
+            <button class="action-btn" style="background:#e65100;" onclick="applyDouble()">2X</button>
+        </div>
+    </div>
+
+    <div class="hist-view" id="logTray">📋 ADVANCED WAGER ACCOUNTING HISTORY:<br></div>
+
+    <div class="modal-overlay" id="cutModal">
+        <div class="cut-box">
+            <h3 style="color:#ffd700; margin:0 0 10px 0;">✂️ INITIAL SHOE CUT</h3>
+            <p style="font-size:11px;">Select a location along the card deck ribbon to cut the shoe:</p>
+            <div class="deck-strip" id="stripContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        const engine = new BaccaratEngine();
+        let selectedChip = 5;
+        let countdownValue = 15;
+        let clockTimerLoop = null;
+        let previousBetsMap = null;
+
+        const cell = 12;
+        const beadCanvas = document.getElementById("canvasBead"); const bCtx = beadCanvas.getContext("2d");
+        const bigCanvas = document.getElementById("canvasBig"); const brCtx = bigCanvas.getContext("2d");
+
+        function resetCanvasGrids() {
+            bCtx.clearRect(0,0,beadCanvas.width,beadCanvas.height); bCtx.strokeStyle = "#e8e8e8"; bCtx.lineWidth = 1;
+            for(let i=0;i<=14;i++){bCtx.beginPath();bCtx.moveTo(i*cell,0);bCtx.lineTo(i*cell,70);bCtx.stroke();}
+            for(let j=0;j<=6;j++){bCtx.beginPath();bCtx.moveTo(0,j*cell);bCtx.lineTo(160,j*cell);bCtx.stroke();}
+            brCtx.clearRect(0,0,bigCanvas.width,bigCanvas.height); brCtx.strokeStyle = "#e8e8e8"; brCtx.lineWidth = 1;
+            for(let i=0;i<=16;i++){brCtx.beginPath();brCtx.moveTo(i*cell,0);brCtx.lineTo(i*cell,70);brCtx.stroke();}
+            for(let j=0;j<=6;j++){brCtx.beginPath();brCtx.moveTo(0,j*cell);brCtx.lineTo(180,j*cell);brCtx.stroke();}
+        }
+
+        function triggerStartupShoeCut() {
+            clearInterval(clockTimerLoop);
+            const container = document.getElementById("stripContainer");
+            container.innerHTML = "";
+            for(let i=1; i<=15; i++) {
+                let node = document.createElement("div");
+                node.className = "slice-card";
+                node.onclick = () => {
+                    document.getElementById("cutModal").style.display = "none";
+                    engine.resetShoe();
+                    resetCanvasGrids();
+                    document.getElementById("shoe-lbl").innerText = "Shoe Round: 0 / 60";
+                    document.getElementById("table-status").innerText = "✨ SHOE ACTIVE! PLACE YOUR CHIPS";
+                    startCountdownClock();
+                };
+                container.appendChild(node);
+            }
+            document.getElementById("cutModal").style.display = "flex";
+        }
+
+        function selectChip(val, element) {
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            element.classList.add('active');
+            selectedChip = val;
+        }
+
+        function addBet(target) {
+            let totalBets = Object.values(engine.activeWagers).reduce((a,b)=>a+b, 0);
+            if (totalBets + selectedChip > engine.maxBetLimit) {
+                document.getElementById("table-status").innerText = "⚠️ EXCEEDED MAX LIMIT (5000)!";
+                return;
+            }
+            if (engine.walletBalance >= selectedChip) {
+                engine.walletBalance -= selectedChip;
+                engine.activeWagers[target] += selectedChip;
+                updateVisuals();
+            }
+        }
+
+        function applyRebet() {
+            if (!previousBetsMap) return;
+            let totalCost = Object.values(previousBetsMap).reduce((a,b)=>a+b,0);
+            if (engine.walletBalance >= totalCost) {
+                engine.walletBalance -= totalCost;
+                engine.activeWagers = { ...previousBetsMap };
+                updateVisuals();
+            }
+        }
+
+        function applyDouble() {
+            let totalBets = Object.values(engine.activeWagers).reduce((a,b)=>a+b, 0);
+            if (engine.walletBalance >= totalBets) {
+                engine.walletBalance -= totalBets;
+                for (let key in engine.activeWagers) { engine.activeWagers[key] *= 2; }
+                updateVisuals();
+            }
+        }
+
+        function updateVisuals() {
+            document.getElementById("user-bal").innerText = engine.walletBalance;
+            for (let key in engine.activeWagers) {
+                let badge = document.getElementById(`lbl-${key}`);
+                badge.innerText = engine.activeWagers[key];
+                badge.style.display = engine.activeWagers[key] > 0 ? "block" : "none";
+            }
+        }
+
+        function startCountdownClock() {
+            clearInterval(clockTimerLoop);
+            countdownValue = 15;
+            document.getElementById("clock-sec").innerText = countdownValue;
+            clockTimerLoop = setInterval(() => {
+                countdownValue--;
+                document.getElementById("clock-sec").innerText = countdownValue;
+                if(countdownValue <= 0) {
+                    clearInterval(clockTimerLoop);
+                    processGameDealing();
+                }
+            }, 1000);
+        }
+
+        function processGameDealing() {
+            document.getElementById("visualFace").className = "anime-face shuffling";
+            document.getElementById("table-status").innerText = "Dealer squeezing cards...";
+            
+            let data = engine.calculateRound(engine.activeWagers);
+            document.getElementById('p-row').innerHTML = ""; document.getElementById('b-row').innerHTML = "";
+
+            let steps = [
+                { t: 600, target: 'p-row', card: data.pHand[0], score: data.pHand[0].val, side: 'P' },
+                { t: 1200, target: 'b-row', card: data.bHand[0], score: data.bHand[0].val, side: 'B' },
+                { t: 1800, target: 'p-row', card: data.pHand[1], score: (data.pHand[0].val+data.pHand[1].val)%10, side: 'P' },
+                { t: 2400, target: 'b-row', card: data.bHand[1], score: (data.bHand[0].val+data.bHand[1].val)%10, side: 'B' }
+            ];
+            if(data.pHand.length > 2) steps.push({ t: 3000, target: 'p-row', card: data.pHand[2], score: data.pScore, side: 'P' });
+            if(data.bHand.length > 2) steps.push({ t: 3600, target: 'b-row', card: data.bHand[2], score: data.bScore, side: 'B' });
+
+            steps.forEach(s => {
+                setTimeout(() => {
+                    let el = document.createElement('div'); el.className = s.card.css; el.innerText = s.card.text;
+                    document.getElementById(s.target).appendChild(el);
+                    setTimeout(() => el.className += " flipped", 40);
+                    if(s.side === 'P') document.getElementById('p-point').innerText = s.score;
+                    if(s.side === 'B') document.getElementById('b-point').innerText = s.score;
+                }, s.t);
+            });
+
+            setTimeout(() => {
+                engine.walletBalance += data.totalWinnings;
+                document.getElementById("shoe-lbl").innerText = `Shoe Round: ${engine.roundCounter} / 60`;
+
+                let outcomeText = data.roundWinner === "P" ? "PLAYER WINS! 🔵" : (data.roundWinner === "B" ? "BANKER WINS! 🔴" : "TIE GAME! 🟢");
+                if (data.checkPanda8) outcomeText = "🐼 PANDA 8 WIN! 🔵";
+                if (data.roundWinner === "B" && data.bScore === 6) outcomeText = "🔥 SUPER 6 BANKER! 🔴";
+
+                document.getElementById("visualFace").className = "anime-face win";
+                document.getElementById("table-status").innerText = `${outcomeText} (+${data.totalWinnings} USDT)`;
+
+                let totalBetPlaced = Object.values(engine.activeWagers).reduce((a,b)=>a+b,0);
+                if (totalBetPlaced > 0) {
+                    let log = document.getElementById("logTray");
+                    log.innerHTML += `Round ${engine.roundCounter} - Bet: ${totalBetPlaced}U | Winnings: ${data.totalWinnings}U (Bal: ${engine.walletBalance}U)<br>`;
+                    log.scrollTop = log.scrollHeight;
+                }
+
+                engine.gameHistoryLog.push(data.roundWinner);
+                drawRoadmaps();
+
+                previousBetsMap = { ...engine.activeWagers };
+                engine.activeWagers = { PLAYER: 0, BANKER: 0, TIE: 0, P_PAIR: 0, B_PAIR: 0, SUPER6: 0, PANDA8: 0 };
+                updateVisuals();
+
+                if (data.shoeFinished) {
+                    document.getElementById("table-status").innerText = "⚠️ SHOE COMPLETED (60 ROUNDS)! RE-SHUFFLING...";
+                    setTimeout(() => { triggerStartupShoeCut(); }, 3000);
+                } else {
+                    startCountdownClock();
+                }
+            }, 4500);
+        }
+
+        function drawRoadmaps() {
+            resetCanvasGrids();
+            for(let i=0; i<engine.gameHistoryLog.length; i++) {
+                let r = i % 6; let c = Math.floor(i / 6);
+                let x = c * cell + cell/2; let y = r * cell + cell/2;
+                bCtx.beginPath(); bCtx.arc(x, y, 4, 0, 2*Math.PI);
+                bCtx.fillStyle = (engine.gameHistoryLog[i]==="P") ? "#0066ff" : (engine.gameHistoryLog[i]==="B" ? "#ff3333" : "#00cc44");
+                bCtx.fill();
+            }
+            let columns = []; let curr = []; let last = "";
+            engine.gameHistoryLog.forEach(out => {
+                if (out === "T") return;
+                if (out === last && curr.length < 6) { curr.push(out); } 
+                else { if (curr.length > 0) columns.push(curr); curr = [out]; last = out; }
+            });
+            if (curr.length > 0) columns.push(curr);
+            columns.forEach((col, cIdx) => {
+                if (cIdx >= 16) return;
+                col.forEach((type, rIdx) => {
+                    let x = cIdx * cell + cell/2; let y = rIdx * cell + cell/2;
+                    brCtx.beginPath(); brCtx.arc(x, y, 3.5, 0, 2*Math.PI);
+                    brCtx.strokeStyle = (type === "P") ? "#0066ff" : "#ff3333";
+                    brCtx.lineWidth = 1; brCtx.stroke();
+                });
+            });
+        }
+
+        resetCanvasGrids();
+        window.onload = () => { triggerStartupShoeCut(); };
+    </script>
+</body>
+</html>
