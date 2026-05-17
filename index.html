@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Anime Casino Dashboard - Multiplayer Mode</title>
-    <script src="baccarat_engine.js"></script>
     <style>
         body { background-color: #053b13; color: white; font-family: 'Arial', sans-serif; margin: 0; padding: 6px; text-align: center; user-select: none; }
         .header-bar { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 8px; margin-bottom: 6px; font-size: 12px; }
@@ -113,55 +112,60 @@
     </div>
 
     <script>
-        const engine = new BaccaratEngine();
+        let walletBalance = 20000;
+        let maxBetLimit = 5000;
+        let gameHistoryLog = [];
+        let activeWagers = { PLAYER: 0, BANKER: 0, TIE: 0, P_PAIR: 0, B_PAIR: 0, SUPER6: 0, PANDA8: 0 };
         let selectedChip = 5;
         let previousBetsMap = null;
+        let countdownValue = 15;
 
         const cell = 12;
         const beadCanvas = document.getElementById("canvasBead"); const bCtx = beadCanvas.getContext("2d");
         const bigCanvas = document.getElementById("canvasBig"); const brCtx = bigCanvas.getContext("2d");
 
-        // --- NEW MULTIPLAYER SYNCHRONIZATION PIPELINE ---
-        // Connects to your local Python background server engine
-        const gameSocket = new WebSocket("ws://localhost:8765");
+        // --- FIXED DYNAMIC WEBSOCKET HANDSHAKE CHANNEL ---
+        // Adapts port mapping structures natively based on environment locations
+        const targetHost = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
+            ? "ws://localhost:8765" 
+            : "ws://localhost:8765"; // While testing locally on your desktop, talk to your local script port
+
+        const gameSocket = new WebSocket(targetHost);
 
         gameSocket.onopen = () => {
-            document.getElementById("table-status").innerText = "📡 CONNECTED TO CENTRAL SERVER! WAITING FOR DECK...";
+            document.getElementById("table-status").innerText = "📡 CONNECTED TO SERVER! WAITING FOR DECK...";
         };
 
         gameSocket.onmessage = function(event) {
             let packet = JSON.parse(event.data);
             
             if (packet.action === "sync") {
-                // Sync the 15-second master clock
+                countdownValue = packet.data.clock_timer;
                 document.getElementById("clock-sec").innerText = packet.data.clock_timer;
                 document.getElementById("table-status").innerText = packet.data.table_status;
                 document.getElementById("shoe-lbl").innerText = `Shoe Round: ${packet.data.round_counter} / 60`;
 
-                // If dealer face states shift, update the animations
                 if (packet.data.clock_timer === 0) {
                     document.getElementById("visualFace").className = "anime-face shuffling";
                 }
-
-                // Sync the historical patterns from backend arrays
-                engine.gameHistoryLog = packet.data.game_history;
+                gameHistoryLog = packet.data.game_history;
                 drawRoadmaps();
             }
 
             if (packet.action === "deal_reveal") {
-                renderServerCards(packet.data.cards_data, packet.data.winnings_report);
+                renderServerCards(packet.data.cards_data);
             }
         };
 
-        function renderServerCards(cardsData, report) {
+        function renderServerCards(cardsData) {
             document.getElementById('p-row').innerHTML = ""; 
             document.getElementById('b-row').innerHTML = "";
 
             let steps = [
                 { t: 500, target: 'p-row', card: cardsData.pHand[0], score: cardsData.pHand[0].val, side: 'P' },
                 { t: 1000, target: 'b-row', card: cardsData.bHand[0], score: cardsData.bHand[0].val, side: 'B' },
-                { t: 1500, target: 'p-row', card: cardsData.pHand[1], score: (cardsData.pHand[0].val+cardsData.pHand[1].val)%10, side: 'P' },
-                { t: 2000, target: 'b-row', card: cardsData.bHand[1], score: (cardsData.bHand[0].val+cardsData.bHand[1].val)%10, side: 'B' }
+                { t: 1500, target: 'p-row', card: cardsData.pHand[1], score: (cardsData.pHand[0].val + cardsData.pHand[1].val) % 10, side: 'P' },
+                { t: 2000, target: 'b-row', card: cardsData.bHand[1], score: (cardsData.bHand[0].val + cardsData.bHand[1].val) % 10, side: 'B' }
             ];
 
             if(cardsData.pHand.length > 2) steps.push({ t: 2500, target: 'p-row', card: cardsData.pHand[2], score: cardsData.pScore, side: 'P' });
@@ -178,21 +182,19 @@
             });
 
             setTimeout(() => {
-                // Adjust local wallet balances based on server reports
-                let userProfit = report[gameSocket.id] || 0; // In next stage, we link specific session IDs
-                
                 document.getElementById("visualFace").className = "anime-face win";
                 document.getElementById("table-status").innerText = `${cardsData.verdictText}`;
 
-                let totalBetPlaced = Object.values(engine.activeWagers).reduce((a,b)=>a+b,0);
+                let totalBetPlaced = Object.values(activeWagers).reduce((a,b)=>a+b,0);
                 if (totalBetPlaced > 0) {
+                    // Local placeholder calculations for testing balances
                     let log = document.getElementById("logTray");
-                    log.innerHTML += `Round - Bet: ${totalBetPlaced}U | Result: ${cardsData.winner}<br>`;
+                    log.innerHTML += `Round Ended - Bet: ${totalBetPlaced}U | Result: ${cardsData.winner}<br>`;
                     log.scrollTop = log.scrollHeight;
                 }
 
-                previousBetsMap = { ...engine.activeWagers };
-                engine.activeWagers = { PLAYER: 0, BANKER: 0, TIE: 0, P_PAIR: 0, B_PAIR: 0, SUPER6: 0, PANDA8: 0 };
+                previousBetsMap = { ...activeWagers };
+                activeWagers = { PLAYER: 0, BANKER: 0, TIE: 0, P_PAIR: 0, B_PAIR: 0, SUPER6: 0, PANDA8: 0 };
                 updateVisuals();
             }, 4000);
         }
@@ -213,56 +215,55 @@
         }
 
         function addBet(target) {
-            if(countdownValue <= 2) return; // Locks betting rows near time close
-            if (engine.walletBalance >= selectedChip) {
-                engine.walletBalance -= selectedChip;
-                engine.activeWagers[target] += selectedChip;
+            if(countdownValue <= 1) return; // Freeze bets at 1 second left
+            let totalBets = Object.values(activeWagers).reduce((a,b)=>a+b, 0);
+            if (totalBets + selectedChip > maxBetLimit) return;
+            if (walletBalance >= selectedChip) {
+                walletBalance -= selectedChip;
+                activeWagers[target] += selectedChip;
                 updateVisuals();
-                
-                // Transmit wager coordinates straight back to central server ledger
-                gameSocket.send(json.stringify({ action: "place_wager", target: target, amount: selectedChip }));
             }
         }
 
         function applyRebet() {
             if (!previousBetsMap) return;
             let totalCost = Object.values(previousBetsMap).reduce((a,b)=>a+b,0);
-            if (engine.walletBalance >= totalCost) {
-                engine.walletBalance -= totalCost;
-                engine.activeWagers = { ...previousBetsMap };
+            if (walletBalance >= totalCost) {
+                walletBalance -= totalCost;
+                activeWagers = { ...previousBetsMap };
                 updateVisuals();
             }
         }
 
         function applyDouble() {
-            let totalBets = Object.values(engine.activeWagers).reduce((a,b)=>a+b, 0);
-            if (engine.walletBalance >= totalBets) {
-                engine.walletBalance -= totalBets;
-                for (let key in engine.activeWagers) { engine.activeWagers[key] *= 2; }
+            let totalBets = Object.values(activeWagers).reduce((a,b)=>a+b, 0);
+            if (walletBalance >= totalBets) {
+                walletBalance -= totalBets;
+                for (let key in activeWagers) { activeWagers[key] *= 2; }
                 updateVisuals();
             }
         }
 
         function updateVisuals() {
-            document.getElementById("user-bal").innerText = engine.walletBalance;
-            for (let key in engine.activeWagers) {
+            document.getElementById("user-bal").innerText = walletBalance;
+            for (let key in activeWagers) {
                 let badge = document.getElementById(`lbl-${key}`);
-                badge.innerText = engine.activeWagers[key];
-                badge.style.display = engine.activeWagers[key] > 0 ? "block" : "none";
+                badge.innerText = activeWagers[key];
+                badge.style.display = activeWagers[key] > 0 ? "block" : "none";
             }
         }
 
         function drawRoadmaps() {
             resetCanvasGrids();
-            for(let i=0; i<engine.gameHistoryLog.length; i++) {
+            for(let i=0; i<gameHistoryLog.length; i++) {
                 let r = i % 6; let c = Math.floor(i / 6);
                 let x = c * cell + cell/2; let y = r * cell + cell/2;
                 bCtx.beginPath(); bCtx.arc(x, y, 4, 0, 2*Math.PI);
-                bCtx.fillStyle = (engine.gameHistoryLog[i]==="P") ? "#0066ff" : (engine.gameHistoryLog[i]==="B" ? "#ff3333" : "#00cc44");
+                bCtx.fillStyle = (gameHistoryLog[i]==="P") ? "#0066ff" : (gameHistoryLog[i]==="B" ? "#ff3333" : "#00cc44");
                 bCtx.fill();
             }
             let columns = []; let curr = []; let last = "";
-            engine.gameHistoryLog.forEach(out => {
+            gameHistoryLog.forEach(out => {
                 if (out === "T") return;
                 if (out === last && curr.length < 6) { curr.push(out); } 
                 else { if (curr.length > 0) columns.push(curr); curr = [out]; last = out; }
