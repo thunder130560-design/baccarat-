@@ -117,8 +117,8 @@
         const bigCanvas = document.getElementById("canvasBig"); const brCtx = bigCanvas.getContext("2d");
 
         // --- ⚙️ SMART AUTOMATIC NETWORK ROUTING BRIDGE ---
-        // PASTE YOUR LATEST LOCALHOST.RUN TUNNEL ADDRESS INSIDE THE QUOTATION MARKS BELOW:
-        const CURRENT_TUNNEL_LINK = "YOUR_NEW_TUNNEL_HERE.lhr.life"; 
+        // ⚠️ TYPE IN TODAY'S UNIQUE LOCALHOST.RUN TUNNEL ADRESS INSIDE HERE:
+        const CURRENT_TUNNEL_LINK = "43c264e3e1eee1.lhr.life"; 
 
         const targetHost = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:") 
             ? "ws://localhost:8765" 
@@ -155,6 +155,7 @@
             document.getElementById('p-row').innerHTML = ""; 
             document.getElementById('b-row').innerHTML = "";
 
+            // Fixed index keys mapping array properties correctly to prevent crashing
             let pInit1 = (cardsData.pHand && cardsData.pHand[0]) ? cardsData.pHand[0].val : 0;
             let pInit2 = (cardsData.pHand && cardsData.pHand[1]) ? cardsData.pHand[1].val : 0;
             let bInit1 = (cardsData.bHand && cardsData.bHand[0]) ? cardsData.bHand[0].val : 0;
