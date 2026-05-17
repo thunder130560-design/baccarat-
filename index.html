@@ -124,13 +124,8 @@
         const beadCanvas = document.getElementById("canvasBead"); const bCtx = beadCanvas.getContext("2d");
         const bigCanvas = document.getElementById("canvasBig"); const brCtx = bigCanvas.getContext("2d");
 
-        // --- FIXED DYNAMIC WEBSOCKET HANDSHAKE CHANNEL ---
-        // Adapts port mapping structures natively based on environment locations
-        const targetHost = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
-            ? "ws://localhost:8765" 
-            : "ws://localhost:8765"; // While testing locally on your desktop, talk to your local script port
-
-        const gameSocket = new WebSocket(targetHost);
+        // --- CONNECTS WEBPAGE DIRECTLY TO LIVE INTERNET TUNNEL ---
+        const gameSocket = new WebSocket("wss://43c264e3e1eee1.lhr.life");
 
         gameSocket.onopen = () => {
             document.getElementById("table-status").innerText = "📡 CONNECTED TO SERVER! WAITING FOR DECK...";
@@ -161,17 +156,23 @@
             document.getElementById('p-row').innerHTML = ""; 
             document.getElementById('b-row').innerHTML = "";
 
+            let pInit1 = cardsData.pHand[0] ? cardsData.pHand[0].val : 0;
+            let pInit2 = cardsData.pHand[1] ? cardsData.pHand[1].val : 0;
+            let bInit1 = cardsData.bHand[0] ? cardsData.bHand[0].val : 0;
+            let bInit2 = cardsData.bHand[1] ? cardsData.bHand[1].val : 0;
+
             let steps = [
-                { t: 500, target: 'p-row', card: cardsData.pHand[0], score: cardsData.pHand[0].val, side: 'P' },
-                { t: 1000, target: 'b-row', card: cardsData.bHand[0], score: cardsData.bHand[0].val, side: 'B' },
-                { t: 1500, target: 'p-row', card: cardsData.pHand[1], score: (cardsData.pHand[0].val + cardsData.pHand[1].val) % 10, side: 'P' },
-                { t: 2000, target: 'b-row', card: cardsData.bHand[1], score: (cardsData.bHand[0].val + cardsData.bHand[1].val) % 10, side: 'B' }
+                { t: 500, target: 'p-row', card: cardsData.pHand[0], score: pInit1, side: 'P' },
+                { t: 1000, target: 'b-row', card: cardsData.bHand[0], score: bInit1, side: 'B' },
+                { t: 1500, target: 'p-row', card: cardsData.pHand[1], score: (pInit1 + pInit2) % 10, side: 'P' },
+                { t: 2000, target: 'b-row', card: cardsData.bHand[1], score: (bInit1 + bInit2) % 10, side: 'B' }
             ];
 
             if(cardsData.pHand.length > 2) steps.push({ t: 2500, target: 'p-row', card: cardsData.pHand[2], score: cardsData.pScore, side: 'P' });
             if(cardsData.bHand.length > 2) steps.push({ t: 3000, target: 'b-row', card: cardsData.bHand[2], score: cardsData.bScore, side: 'B' });
 
             steps.forEach(s => {
+                if (!s.card) return;
                 setTimeout(() => {
                     let el = document.createElement('div'); el.className = s.card.css; el.innerText = s.card.text;
                     document.getElementById(s.target).appendChild(el);
@@ -187,7 +188,6 @@
 
                 let totalBetPlaced = Object.values(activeWagers).reduce((a,b)=>a+b,0);
                 if (totalBetPlaced > 0) {
-                    // Local placeholder calculations for testing balances
                     let log = document.getElementById("logTray");
                     log.innerHTML += `Round Ended - Bet: ${totalBetPlaced}U | Result: ${cardsData.winner}<br>`;
                     log.scrollTop = log.scrollHeight;
@@ -215,7 +215,7 @@
         }
 
         function addBet(target) {
-            if(countdownValue <= 1) return; // Freeze bets at 1 second left
+            if(countdownValue <= 1) return; 
             let totalBets = Object.values(activeWagers).reduce((a,b)=>a+b, 0);
             if (totalBets + selectedChip > maxBetLimit) return;
             if (walletBalance >= selectedChip) {
@@ -270,7 +270,7 @@
             });
             if (curr.length > 0) columns.push(curr);
             columns.forEach((col, cIdx) => {
-                if (cIdx >= 16) return;
+                if (col.length === 0 || cIdx >= 16) return;
                 col.forEach((type, rIdx) => {
                     let x = cIdx * cell + cell/2; let y = rIdx * cell + cell/2;
                     brCtx.beginPath(); brCtx.arc(x, y, 3.5, 0, 2*Math.PI);
