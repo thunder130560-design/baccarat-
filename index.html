@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anime Casino Dashboard</title>
+    <title>Anime Casino Dashboard - Multiplayer Mode</title>
     <script src="baccarat_engine.js"></script>
     <style>
         body { background-color: #053b13; color: white; font-family: 'Arial', sans-serif; margin: 0; padding: 6px; text-align: center; user-select: none; }
@@ -58,7 +58,7 @@
             <div class="eyes-wrap"><div class="eye-ball"></div><div class="eye-ball"></div></div>
             <div class="mouth-line"></div>
         </div>
-        <div id="table-status" style="font-size: 12px; color: #ffd700; font-weight: bold;">💎 INTRODUCING NEW SHOE 💎</div>
+        <div id="table-status" style="font-size: 12px; color: #ffd700; font-weight: bold;">💎 WAITING FOR SERVER CONNECT 💎</div>
         <div class="felt-layout">
             <div class="felt-zone">
                 <div style="font-size:10px; color:#4da6ff; font-weight:bold;">PLAYER (<span id="p-point">0</span>)</div>
@@ -102,7 +102,7 @@
         </div>
     </div>
 
-    <div class="hist-view" id="logTray">📋 ADVANCED WAGER ACCOUNTING HISTORY:<br></div>
+    <div class="hist-view" id="logTray">📋 MULTIPLAYER LEDGER ACCOUNTING HISTORY:<br></div>
 
     <div class="modal-overlay" id="cutModal">
         <div class="cut-box">
@@ -115,41 +115,95 @@
     <script>
         const engine = new BaccaratEngine();
         let selectedChip = 5;
-        let countdownValue = 15;
-        let clockTimerLoop = null;
         let previousBetsMap = null;
 
         const cell = 12;
         const beadCanvas = document.getElementById("canvasBead"); const bCtx = beadCanvas.getContext("2d");
         const bigCanvas = document.getElementById("canvasBig"); const brCtx = bigCanvas.getContext("2d");
 
+        // --- NEW MULTIPLAYER SYNCHRONIZATION PIPELINE ---
+        // Connects to your local Python background server engine
+        const gameSocket = new WebSocket("ws://localhost:8765");
+
+        gameSocket.onopen = () => {
+            document.getElementById("table-status").innerText = "📡 CONNECTED TO CENTRAL SERVER! WAITING FOR DECK...";
+        };
+
+        gameSocket.onmessage = function(event) {
+            let packet = JSON.parse(event.data);
+            
+            if (packet.action === "sync") {
+                // Sync the 15-second master clock
+                document.getElementById("clock-sec").innerText = packet.data.clock_timer;
+                document.getElementById("table-status").innerText = packet.data.table_status;
+                document.getElementById("shoe-lbl").innerText = `Shoe Round: ${packet.data.round_counter} / 60`;
+
+                // If dealer face states shift, update the animations
+                if (packet.data.clock_timer === 0) {
+                    document.getElementById("visualFace").className = "anime-face shuffling";
+                }
+
+                // Sync the historical patterns from backend arrays
+                engine.gameHistoryLog = packet.data.game_history;
+                drawRoadmaps();
+            }
+
+            if (packet.action === "deal_reveal") {
+                renderServerCards(packet.data.cards_data, packet.data.winnings_report);
+            }
+        };
+
+        function renderServerCards(cardsData, report) {
+            document.getElementById('p-row').innerHTML = ""; 
+            document.getElementById('b-row').innerHTML = "";
+
+            let steps = [
+                { t: 500, target: 'p-row', card: cardsData.pHand[0], score: cardsData.pHand[0].val, side: 'P' },
+                { t: 1000, target: 'b-row', card: cardsData.bHand[0], score: cardsData.bHand[0].val, side: 'B' },
+                { t: 1500, target: 'p-row', card: cardsData.pHand[1], score: (cardsData.pHand[0].val+cardsData.pHand[1].val)%10, side: 'P' },
+                { t: 2000, target: 'b-row', card: cardsData.bHand[1], score: (cardsData.bHand[0].val+cardsData.bHand[1].val)%10, side: 'B' }
+            ];
+
+            if(cardsData.pHand.length > 2) steps.push({ t: 2500, target: 'p-row', card: cardsData.pHand[2], score: cardsData.pScore, side: 'P' });
+            if(cardsData.bHand.length > 2) steps.push({ t: 3000, target: 'b-row', card: cardsData.bHand[2], score: cardsData.bScore, side: 'B' });
+
+            steps.forEach(s => {
+                setTimeout(() => {
+                    let el = document.createElement('div'); el.className = s.card.css; el.innerText = s.card.text;
+                    document.getElementById(s.target).appendChild(el);
+                    setTimeout(() => el.className += " flipped", 40);
+                    if(s.side === 'P') document.getElementById('p-point').innerText = s.score;
+                    if(s.side === 'B') document.getElementById('b-point').innerText = s.score;
+                }, s.t);
+            });
+
+            setTimeout(() => {
+                // Adjust local wallet balances based on server reports
+                let userProfit = report[gameSocket.id] || 0; // In next stage, we link specific session IDs
+                
+                document.getElementById("visualFace").className = "anime-face win";
+                document.getElementById("table-status").innerText = `${cardsData.verdictText}`;
+
+                let totalBetPlaced = Object.values(engine.activeWagers).reduce((a,b)=>a+b,0);
+                if (totalBetPlaced > 0) {
+                    let log = document.getElementById("logTray");
+                    log.innerHTML += `Round - Bet: ${totalBetPlaced}U | Result: ${cardsData.winner}<br>`;
+                    log.scrollTop = log.scrollHeight;
+                }
+
+                previousBetsMap = { ...engine.activeWagers };
+                engine.activeWagers = { PLAYER: 0, BANKER: 0, TIE: 0, P_PAIR: 0, B_PAIR: 0, SUPER6: 0, PANDA8: 0 };
+                updateVisuals();
+            }, 4000);
+        }
+
         function resetCanvasGrids() {
             bCtx.clearRect(0,0,beadCanvas.width,beadCanvas.height); bCtx.strokeStyle = "#e8e8e8"; bCtx.lineWidth = 1;
             for(let i=0;i<=14;i++){bCtx.beginPath();bCtx.moveTo(i*cell,0);bCtx.lineTo(i*cell,70);bCtx.stroke();}
             for(let j=0;j<=6;j++){bCtx.beginPath();bCtx.moveTo(0,j*cell);bCtx.lineTo(160,j*cell);bCtx.stroke();}
             brCtx.clearRect(0,0,bigCanvas.width,bigCanvas.height); brCtx.strokeStyle = "#e8e8e8"; brCtx.lineWidth = 1;
-            for(let i=0;i<=16;i++){brCtx.beginPath();brCtx.moveTo(i*cell,0);brCtx.lineTo(i*cell,70);brCtx.stroke();}
-            for(let j=0;j<=6;j++){brCtx.beginPath();brCtx.moveTo(0,j*cell);brCtx.lineTo(180,j*cell);brCtx.stroke();}
-        }
-
-        function triggerStartupShoeCut() {
-            clearInterval(clockTimerLoop);
-            const container = document.getElementById("stripContainer");
-            container.innerHTML = "";
-            for(let i=1; i<=15; i++) {
-                let node = document.createElement("div");
-                node.className = "slice-card";
-                node.onclick = () => {
-                    document.getElementById("cutModal").style.display = "none";
-                    engine.resetShoe();
-                    resetCanvasGrids();
-                    document.getElementById("shoe-lbl").innerText = "Shoe Round: 0 / 60";
-                    document.getElementById("table-status").innerText = "✨ SHOE ACTIVE! PLACE YOUR CHIPS";
-                    startCountdownClock();
-                };
-                container.appendChild(node);
-            }
-            document.getElementById("cutModal").style.display = "flex";
+            for(let i=0; i<=16; i++){brCtx.beginPath();brCtx.moveTo(i*cell,0);brCtx.lineTo(i*cell,70);brCtx.stroke();}
+            for(let j=0; j<=6; j++){brCtx.beginPath();brCtx.moveTo(0,j*cell);brCtx.lineTo(180,j*cell);brCtx.stroke();}
         }
 
         function selectChip(val, element) {
@@ -159,15 +213,14 @@
         }
 
         function addBet(target) {
-            let totalBets = Object.values(engine.activeWagers).reduce((a,b)=>a+b, 0);
-            if (totalBets + selectedChip > engine.maxBetLimit) {
-                document.getElementById("table-status").innerText = "⚠️ EXCEEDED MAX LIMIT (5000)!";
-                return;
-            }
+            if(countdownValue <= 2) return; // Locks betting rows near time close
             if (engine.walletBalance >= selectedChip) {
                 engine.walletBalance -= selectedChip;
                 engine.activeWagers[target] += selectedChip;
                 updateVisuals();
+                
+                // Transmit wager coordinates straight back to central server ledger
+                gameSocket.send(json.stringify({ action: "place_wager", target: target, amount: selectedChip }));
             }
         }
 
@@ -199,80 +252,6 @@
             }
         }
 
-        function startCountdownClock() {
-            clearInterval(clockTimerLoop);
-            countdownValue = 15;
-            document.getElementById("clock-sec").innerText = countdownValue;
-            clockTimerLoop = setInterval(() => {
-                countdownValue--;
-                document.getElementById("clock-sec").innerText = countdownValue;
-                if(countdownValue <= 0) {
-                    clearInterval(clockTimerLoop);
-                    processGameDealing();
-                }
-            }, 1000);
-        }
-
-        function processGameDealing() {
-            document.getElementById("visualFace").className = "anime-face shuffling";
-            document.getElementById("table-status").innerText = "Dealer squeezing cards...";
-            
-            let data = engine.calculateRound(engine.activeWagers);
-            document.getElementById('p-row').innerHTML = ""; document.getElementById('b-row').innerHTML = "";
-
-            let steps = [
-                { t: 600, target: 'p-row', card: data.pHand[0], score: data.pHand[0].val, side: 'P' },
-                { t: 1200, target: 'b-row', card: data.bHand[0], score: data.bHand[0].val, side: 'B' },
-                { t: 1800, target: 'p-row', card: data.pHand[1], score: (data.pHand[0].val+data.pHand[1].val)%10, side: 'P' },
-                { t: 2400, target: 'b-row', card: data.bHand[1], score: (data.bHand[0].val+data.bHand[1].val)%10, side: 'B' }
-            ];
-            if(data.pHand.length > 2) steps.push({ t: 3000, target: 'p-row', card: data.pHand[2], score: data.pScore, side: 'P' });
-            if(data.bHand.length > 2) steps.push({ t: 3600, target: 'b-row', card: data.bHand[2], score: data.bScore, side: 'B' });
-
-            steps.forEach(s => {
-                setTimeout(() => {
-                    let el = document.createElement('div'); el.className = s.card.css; el.innerText = s.card.text;
-                    document.getElementById(s.target).appendChild(el);
-                    setTimeout(() => el.className += " flipped", 40);
-                    if(s.side === 'P') document.getElementById('p-point').innerText = s.score;
-                    if(s.side === 'B') document.getElementById('b-point').innerText = s.score;
-                }, s.t);
-            });
-
-            setTimeout(() => {
-                engine.walletBalance += data.totalWinnings;
-                document.getElementById("shoe-lbl").innerText = `Shoe Round: ${engine.roundCounter} / 60`;
-
-                let outcomeText = data.roundWinner === "P" ? "PLAYER WINS! 🔵" : (data.roundWinner === "B" ? "BANKER WINS! 🔴" : "TIE GAME! 🟢");
-                if (data.checkPanda8) outcomeText = "🐼 PANDA 8 WIN! 🔵";
-                if (data.roundWinner === "B" && data.bScore === 6) outcomeText = "🔥 SUPER 6 BANKER! 🔴";
-
-                document.getElementById("visualFace").className = "anime-face win";
-                document.getElementById("table-status").innerText = `${outcomeText} (+${data.totalWinnings} USDT)`;
-
-                let totalBetPlaced = Object.values(engine.activeWagers).reduce((a,b)=>a+b,0);
-                if (totalBetPlaced > 0) {
-                    let log = document.getElementById("logTray");
-                    log.innerHTML += `Round ${engine.roundCounter} - Bet: ${totalBetPlaced}U | Winnings: ${data.totalWinnings}U (Bal: ${engine.walletBalance}U)<br>`;
-                    log.scrollTop = log.scrollHeight;
-                }
-
-                engine.gameHistoryLog.push(data.roundWinner);
-                drawRoadmaps();
-
-                previousBetsMap = { ...engine.activeWagers };
-                engine.activeWagers = { PLAYER: 0, BANKER: 0, TIE: 0, P_PAIR: 0, B_PAIR: 0, SUPER6: 0, PANDA8: 0 };
-                updateVisuals();
-
-                if (data.shoeFinished) {
-                    document.getElementById("table-status").innerText = "⚠️ SHOE COMPLETED (60 ROUNDS)! RE-SHUFFLING...";
-                    setTimeout(() => { triggerStartupShoeCut(); }, 3000);
-                } else {
-                    startCountdownClock();
-                }
-            }, 4500);
-        }
-
         function drawRoadmaps() {
             resetCanvasGrids();
             for(let i=0; i<engine.gameHistoryLog.length; i++) {
@@ -301,7 +280,6 @@
         }
 
         resetCanvasGrids();
-        window.onload = () => { triggerStartupShoeCut(); };
     </script>
 </body>
 </html>
