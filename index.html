@@ -103,14 +103,6 @@
 
     <div class="hist-view" id="logTray">📋 MULTIPLAYER LEDGER ACCOUNTING HISTORY:<br></div>
 
-    <div class="modal-overlay" id="cutModal">
-        <div class="cut-box">
-            <h3 style="color:#ffd700; margin:0 0 10px 0;">✂️ INITIAL SHOE CUT</h3>
-            <p style="font-size:11px;">Select a location along the card deck ribbon to cut the shoe:</p>
-            <div class="deck-strip" id="stripContainer"></div>
-        </div>
-    </div>
-
     <script>
         let walletBalance = 20000;
         let maxBetLimit = 5000;
@@ -124,8 +116,15 @@
         const beadCanvas = document.getElementById("canvasBead"); const bCtx = beadCanvas.getContext("2d");
         const bigCanvas = document.getElementById("canvasBig"); const brCtx = bigCanvas.getContext("2d");
 
-        // --- CONNECTS WEBPAGE DIRECTLY TO LIVE INTERNET TUNNEL ---
-        const gameSocket = new WebSocket("wss://43c264e3e1eee1.lhr.life");
+        // --- ⚙️ SMART AUTOMATIC NETWORK ROUTING BRIDGE ---
+        // PASTE YOUR LATEST LOCALHOST.RUN TUNNEL ADDRESS INSIDE THE QUOTATION MARKS BELOW:
+        const CURRENT_TUNNEL_LINK = "YOUR_NEW_TUNNEL_HERE.lhr.life"; 
+
+        const targetHost = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:") 
+            ? "ws://localhost:8765" 
+            : "wss://" + CURRENT_TUNNEL_LINK;
+
+        const gameSocket = new WebSocket(targetHost);
 
         gameSocket.onopen = () => {
             document.getElementById("table-status").innerText = "📡 CONNECTED TO SERVER! WAITING FOR DECK...";
@@ -156,20 +155,20 @@
             document.getElementById('p-row').innerHTML = ""; 
             document.getElementById('b-row').innerHTML = "";
 
-            let pInit1 = cardsData.pHand[0] ? cardsData.pHand[0].val : 0;
-            let pInit2 = cardsData.pHand[1] ? cardsData.pHand[1].val : 0;
-            let bInit1 = cardsData.bHand[0] ? cardsData.bHand[0].val : 0;
-            let bInit2 = cardsData.bHand[1] ? cardsData.bHand[1].val : 0;
+            let pInit1 = (cardsData.pHand && cardsData.pHand[0]) ? cardsData.pHand[0].val : 0;
+            let pInit2 = (cardsData.pHand && cardsData.pHand[1]) ? cardsData.pHand[1].val : 0;
+            let bInit1 = (cardsData.bHand && cardsData.bHand[0]) ? cardsData.bHand[0].val : 0;
+            let bInit2 = (cardsData.bHand && cardsData.bHand[1]) ? cardsData.bHand[1].val : 0;
 
             let steps = [
-                { t: 500, target: 'p-row', card: cardsData.pHand[0], score: pInit1, side: 'P' },
-                { t: 1000, target: 'b-row', card: cardsData.bHand[0], score: bInit1, side: 'B' },
-                { t: 1500, target: 'p-row', card: cardsData.pHand[1], score: (pInit1 + pInit2) % 10, side: 'P' },
-                { t: 2000, target: 'b-row', card: cardsData.bHand[1], score: (bInit1 + bInit2) % 10, side: 'B' }
+                { t: 500, target: 'p-row', card: cardsData.pHand ? cardsData.pHand[0] : null, score: pInit1, side: 'P' },
+                { t: 1000, target: 'b-row', card: cardsData.bHand ? cardsData.bHand[0] : null, score: bInit1, side: 'B' },
+                { t: 1500, target: 'p-row', card: cardsData.pHand ? cardsData.pHand[1] : null, score: (pInit1 + pInit2) % 10, side: 'P' },
+                { t: 2000, target: 'b-row', card: cardsData.bHand ? cardsData.bHand[1] : null, score: (bInit1 + bInit2) % 10, side: 'B' }
             ];
 
-            if(cardsData.pHand.length > 2) steps.push({ t: 2500, target: 'p-row', card: cardsData.pHand[2], score: cardsData.pScore, side: 'P' });
-            if(cardsData.bHand.length > 2) steps.push({ t: 3000, target: 'b-row', card: cardsData.bHand[2], score: cardsData.bScore, side: 'B' });
+            if(cardsData.pHand && cardsData.pHand.length > 2) steps.push({ t: 2500, target: 'p-row', card: cardsData.pHand[2], score: cardsData.pScore, side: 'P' });
+            if(cardsData.bHand && cardsData.bHand.length > 2) steps.push({ t: 3000, target: 'b-row', card: cardsData.bHand[2], score: cardsData.bScore, side: 'B' });
 
             steps.forEach(s => {
                 if (!s.card) return;
