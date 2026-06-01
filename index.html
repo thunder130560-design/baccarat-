@@ -2,283 +2,1036 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anime Casino Dashboard - Multiplayer Mode</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>CryptoBet | Soccer Betting USDT TRC-20</title>
     <style>
-        body { background-color: #053b13; color: white; font-family: 'Arial', sans-serif; margin: 0; padding: 6px; text-align: center; user-select: none; }
-        .header-bar { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 8px; margin-bottom: 6px; font-size: 12px; }
-        .timer-badge { background: #d81b60; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
-        .dealer-box { position: relative; background: radial-gradient(circle, #0e722b 0%, #03240b 100%); border-radius: 12px; padding: 10px; border: 2px solid #ffd700; }
-        .anime-face { width: 70px; height: 70px; background: #fff0e0; border-radius: 50%; margin: 0 auto 5px auto; position: relative; border: 2px solid #ffb74d; }
-        .hair-top { position: absolute; top: -4px; left: -4px; width: 78px; height: 40px; background: #6a1b9a; border-radius: 40px 40px 0 0; }
-        .eyes-wrap { display: flex; justify-content: space-between; width: 38px; position: absolute; top: 28px; left: 16px; }
-        .eye-ball { width: 10px; height: 14px; background: #283593; border-radius: 50%; border-top: 2px solid #000; }
-        .mouth-line { width: 10px; height: 5px; background: #900c3f; border-radius: 0 0 10px 10px; position: absolute; top: 48px; left: 30px; }
-        .shuffling .eye-ball { height: 3px; border-radius: 0; background: #000; margin-top: 5px; }
-        .win .eye-ball { height: 8px; width: 12px; background: transparent; border-top: 3px solid #283593; border-radius: 50% 50% 0 0; }
-        .win .mouth-line { width: 14px; height: 8px; border-radius: 0 0 14px 14px; background: #d81b60; }
-        .felt-layout { display: flex; justify-content: center; gap: 10px; margin-top: 5px; }
-        .felt-zone { background: rgba(0,0,0,0.3); padding: 6px; border-radius: 6px; width: 145px; }
-        .cards-flex { display: flex; gap: 4px; height: 55px; justify-content: center; align-items: center; min-height: 55px; }
-        .card { background: white; color: black; width: 36px; height: 52px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; transform: rotateY(90deg); transition: transform 0.3s; }
-        .card.flipped { transform: rotateY(0deg); }
-        .red { color: #d11a2a; }
-        .boards-flex { display: flex; justify-content: center; gap: 6px; margin: 6px 0; }
-        .board-card { background: white; color: black; padding: 4px; border-radius: 6px; }
-        .board-lbl { font-size: 8px; font-weight: bold; text-align: left; color: #444; margin-bottom: 2px; }
-        canvas { display: block; background: #fff; }
-        .bet-matrix { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 0 auto; max-width: 360px; }
-        .bet-node { background: rgba(0,0,0,0.4); border: 1px solid #ffd700; border-radius: 6px; padding: 6px 2px; cursor: pointer; position: relative; }
-        .chip-counter { position: absolute; top: -5px; right: -5px; background: #d81b60; color: white; font-size: 9px; padding: 1px 5px; border-radius: 10px; border: 1px solid white; display: none; }
-        .chip-tray { display: flex; justify-content: center; gap: 8px; margin: 8px auto; max-width: 360px; }
-        .chip { width: 36px; height: 36px; border-radius: 50%; border: 2px dashed white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; background: #0088cc; cursor: pointer; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
-        .chip.active { border: 2px solid #ffd700; transform: scale(1.1); box-shadow: 0 0 6px #ffd700; }
-        .dock-panel { display: flex; justify-content: space-between; align-items: center; max-width: 360px; margin: 6px auto; background: rgba(0,0,0,0.3); padding: 6px 12px; border-radius: 20px; }
-        .action-btn { background: #4caf50; border: none; padding: 4px 10px; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; }
-        .hist-view { background: rgba(0,0,0,0.5); border-radius: 6px; padding: 4px; max-width: 360px; margin: 4px auto; font-size: 10px; text-align: left; max-height: 50px; overflow-y: auto; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0a1f1c 0%, #0b2b25 100%);
+            min-height: 100vh;
+            padding: 12px;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(10, 30, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 28px;
+            padding: 15px 18px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(243, 179, 61, 0.3);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo h1 {
+            font-size: 1.3rem;
+            background: linear-gradient(135deg, #f5e7a3, #f3b33d);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .logo p {
+            color: #b8dfd0;
+            font-size: 0.65rem;
+        }
+
+        /* Auth section - MOBILE FRIENDLY */
+        .auth-section {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: #0e2520;
+            padding: 8px 12px;
+            border-radius: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .auth-input-small {
+            background: #071d19;
+            border: 1px solid #356b5d;
+            padding: 10px 12px;
+            border-radius: 30px;
+            color: #f5efdf;
+            font-size: 0.85rem;
+            outline: none;
+            width: 110px;
+        }
+
+        .auth-input-small:focus {
+            border-color: #f3b33d;
+        }
+
+        .auth-btn-small {
+            background: linear-gradient(95deg, #f3b33d, #e69422);
+            border: none;
+            padding: 10px 16px;
+            border-radius: 30px;
+            font-weight: 700;
+            color: #0c241f;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: transform 0.05s ease;
+        }
         
-        .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; z-index:999; }
-        .cut-box { background:#0b531e; padding:20px; border-radius:10px; border:2px solid #ffd700; text-align:center; }
-        .deck-strip { display:flex; gap:3px; margin:15px 0; justify-content:center; }
-        .slice-card { width:15px; height:40px; background:#b71c1c; border:1px solid #fff; cursor:pointer; border-radius:2px; }
-        .slice-card:hover { transform: translateY(-4px); border-color:#ffd700; }
+        .auth-btn-small:active {
+            transform: scale(0.96);
+        }
+
+        .auth-btn-small.outline {
+            background: transparent;
+            border: 1px solid #f3b33d;
+            color: #f3b33d;
+        }
+
+        /* User info */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #0e2520;
+            padding: 5px 16px;
+            border-radius: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .balance {
+            color: #f3b33d;
+            font-weight: 800;
+            font-size: 1rem;
+        }
+
+        .logout-btn {
+            background: #3a2a1a;
+            border: none;
+            color: #ffcf8a;
+            padding: 6px 14px;
+            border-radius: 30px;
+            cursor: pointer;
+        }
+        
+        .logout-btn:active {
+            transform: scale(0.96);
+        }
+
+        /* Navigation tabs - MOBILE */
+        .nav-tabs {
+            display: flex;
+            gap: 5px;
+            background: #0e2520;
+            padding: 5px;
+            border-radius: 50px;
+            margin-bottom: 20px;
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 12px 12px;
+            border: none;
+            background: transparent;
+            color: #a2c9bc;
+            cursor: pointer;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .nav-tab:active {
+            transform: scale(0.97);
+        }
+
+        .nav-tab.active {
+            background: #f3b33d;
+            color: #0a2a24;
+        }
+
+        /* Content panels */
+        .content-panel {
+            display: none;
+        }
+
+        .content-panel.active {
+            display: block;
+        }
+
+        /* League filters - MOBILE SCROLLABLE */
+        .league-filters {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 5px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .league-filter-btn {
+            background: #1a3a33;
+            border: 1px solid #4a7b6e;
+            padding: 8px 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: #c0e0d6;
+            white-space: nowrap;
+            transition: transform 0.05s ease;
+        }
+        
+        .league-filter-btn:active {
+            transform: scale(0.96);
+        }
+
+        .league-filter-btn.active {
+            background: #f3b33d;
+            color: #0a2a24;
+        }
+
+        /* Matches grid - MOBILE RESPONSIVE */
+        .matches-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        @media (min-width: 600px) {
+            .matches-grid {
+                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            }
+        }
+
+        .match-card {
+            background: rgba(18, 32, 28, 0.85);
+            border-radius: 28px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 200, 100, 0.2);
+            transition: transform 0.1s ease;
+        }
+        
+        .match-card:active {
+            transform: scale(0.99);
+        }
+
+        .match-header {
+            background: #0e2520;
+            padding: 12px 16px;
+            border-bottom: 1px solid #2a5448;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .league {
+            background: #e9c46a20;
+            padding: 4px 10px;
+            border-radius: 40px;
+            font-size: 0.65rem;
+            color: #f3d382;
+        }
+
+        .teams {
+            padding: 16px 16px 8px;
+            text-align: center;
+        }
+
+        .team-name {
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: #f5efdf;
+        }
+
+        .vs {
+            font-size: 0.8rem;
+            color: #e9c46a;
+            margin: 6px 0;
+        }
+
+        /* Odds panel - LARGE TOUCH TARGETS */
+        .odds-panel {
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 16px 20px;
+            gap: 12px;
+        }
+
+        .odd-card {
+            background: #071d19;
+            border-radius: 24px;
+            flex: 1;
+            text-align: center;
+            padding: 14px 6px;
+            cursor: pointer;
+            border: 1px solid #356b5d;
+            transition: all 0.05s ease;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .odd-card:active {
+            background: #2e5e52;
+            transform: scale(0.97);
+        }
+
+        .odd-value {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #ffdd99;
+        }
+
+        /* Bet slip */
+        .bet-slip-panel {
+            margin-top: 30px;
+            background: #0c2621e6;
+            border-radius: 28px;
+            padding: 18px;
+            margin-bottom: 20px;
+        }
+
+        .slip-header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #ffdfa070;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .slip-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #f7de9c;
+        }
+
+        .clear-slips {
+            background: #3a2a1a;
+            border: none;
+            color: #ffcf8a;
+            padding: 6px 14px;
+            border-radius: 30px;
+            cursor: pointer;
+        }
+        
+        .clear-slips:active {
+            transform: scale(0.96);
+        }
+
+        .bet-items-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .slip-item {
+            background: #0e2923;
+            border-radius: 20px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .stake-input {
+            width: 80px;
+            background: #071d19;
+            border: 1px solid #f3b33d;
+            border-radius: 20px;
+            padding: 8px;
+            text-align: center;
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .remove-bet {
+            background: none;
+            border: none;
+            color: #ff9f6e;
+            font-size: 1.3rem;
+            cursor: pointer;
+            padding: 5px 10px;
+        }
+        
+        .remove-bet:active {
+            transform: scale(0.9);
+        }
+
+        .submit-bets {
+            width: 100%;
+            background: linear-gradient(95deg, #f3b33d, #e69422);
+            border: none;
+            padding: 16px;
+            border-radius: 60px;
+            font-weight: 800;
+            font-size: 1rem;
+            margin-top: 18px;
+            cursor: pointer;
+        }
+        
+        .submit-bets:active {
+            transform: scale(0.98);
+        }
+
+        /* Wallet cards */
+        .wallet-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        @media (min-width: 700px) {
+            .wallet-grid {
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            }
+        }
+
+        .wallet-card {
+            background: #0e2923;
+            border-radius: 28px;
+            padding: 20px;
+            border: 1px solid #f3b33d40;
+        }
+
+        .trc20-address {
+            background: #071d19;
+            padding: 12px;
+            border-radius: 20px;
+            text-align: center;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 0.75rem;
+            margin: 15px 0;
+        }
+
+        .copy-btn {
+            background: #f3b33d;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+        }
+        
+        .copy-btn:active {
+            transform: scale(0.97);
+        }
+
+        .history-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            background: #071d19;
+            padding: 12px;
+            border-radius: 20px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .warning-banner {
+            background: #3a2a1a;
+            border-left: 4px solid #f3b33d;
+            padding: 10px 16px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            color: #ffcf8a;
+            font-size: 0.75rem;
+        }
+
+        /* Touch optimizations */
+        button, .odd-card, .league-filter-btn, .nav-tab {
+            touch-action: manipulation;
+        }
+        
+        input {
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
-
-    <div class="header-bar">
-        <div>⏳ Auto-Deal: <span class="timer-badge" id="clock-sec">15</span>s</div>
-        <div id="shoe-lbl" style="color:#ffeb3b; font-weight:bold;">Shoe Round: 0 / 60</div>
-    </div>
-
-    <div class="dealer-box">
-        <div class="anime-face" id="visualFace">
-            <div class="hair-top"></div>
-            <div class="eyes-wrap"><div class="eye-ball"></div><div class="eye-ball"></div></div>
-            <div class="mouth-line"></div>
+<div class="main-container">
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <h1>⚽ CryptoBet</h1>
+            <p>USDT TRC-20 • Live Soccer Odds</p>
         </div>
-        <div id="table-status" style="font-size: 12px; color: #ffd700; font-weight: bold;">💎 WAITING FOR SERVER CONNECT 💎</div>
-        <div class="felt-layout">
-            <div class="felt-zone">
-                <div style="font-size:10px; color:#4da6ff; font-weight:bold;">PLAYER (<span id="p-point">0</span>)</div>
-                <div class="cards-flex" id="p-row"></div>
-            </div>
-            <div class="felt-zone">
-                <div style="font-size:10px; color:#ff4d4d; font-weight:bold;">BANKER (<span id="b-point">0</span>)</div>
-                <div class="cards-flex" id="b-row"></div>
+        
+        <div id="authSection">
+            <!-- Will be filled by JS -->
+            <div class="auth-section">
+                <input type="text" id="loginUsername" class="auth-input-small" placeholder="Username">
+                <input type="password" id="loginPassword" class="auth-input-small" placeholder="Password">
+                <button class="auth-btn-small" id="loginBtn">Login</button>
+                <button class="auth-btn-small outline" id="signupShowBtn">Sign Up</button>
             </div>
         </div>
     </div>
 
-    <div class="boards-flex">
-        <div class="board-card"><div class="board-lbl">🔴 BEAD PLATE MAP</div><canvas id="canvasBead" width="160" height="70"></canvas></div>
-        <div class="board-card"><div class="board-lbl">📊 BIG ROAD ANALYSIS</div><canvas id="canvasBig" width="180" height="70"></canvas></div>
+    <div class="warning-banner" id="warningBanner">
+        ⚡ <strong>Mobile Ready!</strong> Tap any odd to add to bet slip. Type <code style="background:#1a3a33;padding:2px 6px;border-radius:10px;">simulateDeposit(100)</code> in console for test funds.
     </div>
 
-    <div class="bet-matrix">
-        <div class="bet-node" onclick="addBet('PLAYER')"><div class="chip-counter" id="lbl-PLAYER">0</div><div class="node-lbl" style="color:#4da6ff;">PLAYER</div><div class="node-payout">1 : 1</div></div>
-        <div class="bet-node" onclick="addBet('TIE')"><div class="chip-counter" id="lbl-TIE">0</div><div class="node-lbl" style="color:#4caf50;">TIE</div><div class="node-payout">8 : 1</div></div>
-        <div class="bet-node" onclick="addBet('BANKER')"><div class="chip-counter" id="lbl-BANKER">0</div><div class="node-lbl" style="color:#ff4d4d;">BANKER</div><div class="node-payout">1 : 0.95*</div></div>
-        <div class="bet-node" onclick="addBet('P_PAIR')"><div class="chip-counter" id="lbl-P_PAIR">0</div><div class="node-lbl" style="color:#4da6ff;">PLAYER PAIR</div><div class="node-payout">11 : 1</div></div>
-        <div class="bet-node" onclick="addBet('SUPER6')"><div class="chip-counter" id="lbl-SUPER6">0</div><div class="node-lbl" style="color:#ff9100;">SUPER 6</div><div class="node-payout">12x / 20x</div></div>
-        <div class="bet-node" onclick="addBet('B_PAIR')"><div class="chip-counter" id="lbl-B_PAIR">0</div><div class="node-lbl" style="color:#ff4d4d;">BANKER PAIR</div><div class="node-payout">11 : 1</div></div>
-        <div class="bet-node" onclick="addBet('PANDA8')" style="grid-column: span 3; border-color:#ffeb3b;"><div class="chip-counter" id="lbl-PANDA8">0</div><div class="node-lbl" style="color:#ffeb3b;">🐼 PANDA 8 (3-CARD 8 WIN)</div><div class="node-payout">25 : 1</div></div>
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+        <button class="nav-tab active" data-panel="betting">🎲 Betting</button>
+        <button class="nav-tab" data-panel="wallet">💳 Wallet</button>
+        <button class="nav-tab" data-panel="history">📜 History</button>
     </div>
 
-    <div class="chip-tray">
-        <div class="chip active" style="background:#4caf50;" onclick="selectChip(5, this)">$5</div>
-        <div class="chip" style="background:#0088cc;" onclick="selectChip(10, this)">$10</div>
-        <div class="chip" style="background:#e65100;" onclick="selectChip(50, this)">$50</div>
-        <div class="chip" style="background:#9c27b0;" onclick="selectChip(100, this)">$100</div>
-        <div class="chip" style="background:#d11a2a;" onclick="selectChip(500, this)">$500</div>
-    </div>
-
-    <div class="dock-panel">
-        <div style="font-size:12px; color:#ffeb3b; font-weight:bold;">💰 <span id="user-bal">20000</span> USDT</div>
-        <div>
-            <button class="action-btn" onclick="applyRebet()">Rebet</button>
-            <button class="action-btn" style="background:#e65100;" onclick="applyDouble()">2X</button>
+    <!-- Betting Panel -->
+    <div id="bettingPanel" class="content-panel active">
+        <div class="league-filters" id="leagueFilters">
+            <button class="league-filter-btn active" data-league="all">All Leagues</button>
+            <button class="league-filter-btn" data-league="Premier League">🏴 EPL</button>
+            <button class="league-filter-btn" data-league="La Liga">🇪🇸 La Liga</button>
+            <button class="league-filter-btn" data-league="Bundesliga">🇩🇪 Bundesliga</button>
+            <button class="league-filter-btn" data-league="Serie A">🇮🇹 Serie A</button>
+            <button class="league-filter-btn" data-league="Ligue 1">🇫🇷 Ligue 1</button>
+        </div>
+        
+        <div id="matchesContainer" class="matches-grid">
+            <div style="text-align:center; padding:40px; color:#a2c9bc;">
+                🔐 Please login to see matches
+            </div>
+        </div>
+        
+        <div class="bet-slip-panel">
+            <div class="slip-header">
+                <span class="slip-title">📋 BET SLIP</span>
+                <button class="clear-slips" id="clearSlipBtn">Clear</button>
+            </div>
+            <div id="betSlipList" class="bet-items-list">
+                <div style="text-align:center; color:#9dc2b5; padding:20px;">Tap odds to add bets</div>
+            </div>
+            <button class="submit-bets" id="placeBetsBtn">✔️ PLACE BETS</button>
         </div>
     </div>
 
-    <div class="hist-view" id="logTray">📋 MULTIPLAYER LEDGER ACCOUNTING HISTORY:<br></div>
-
-    <script>
-        let walletBalance = 20000;
-        let maxBetLimit = 5000;
-        let gameHistoryLog = [];
-        let activeWagers = { PLAYER: 0, BANKER: 0, TIE: 0, P_PAIR: 0, B_PAIR: 0, SUPER6: 0, PANDA8: 0 };
-        let selectedChip = 5;
-        let previousBetsMap = null;
-        let countdownValue = 15;
-
-        const cell = 12;
-        const beadCanvas = document.getElementById("canvasBead"); const bCtx = beadCanvas.getContext("2d");
-        const bigCanvas = document.getElementById("canvasBig"); const brCtx = bigCanvas.getContext("2d");
-
-        // --- ⚙️ SMART AUTOMATIC NETWORK ROUTING BRIDGE ---
-        const CURRENT_TUNNEL_LINK = "696985ac3f471e.lhr.life"; 
-
-        const targetHost = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:") 
-            ? "ws://localhost:8765" 
-            : "wss://" + CURRENT_TUNNEL_LINK;
-
-        const gameSocket = new WebSocket(targetHost);
-
-        gameSocket.onopen = () => {
-            document.getElementById("table-status").innerText = "📡 CONNECTED TO SERVER! WAITING FOR DECK...";
-        };
-
-        gameSocket.onmessage = function(event) {
-            let packet = JSON.parse(event.data);
+    <!-- Wallet Panel -->
+    <div id="walletPanel" class="content-panel">
+        <div class="wallet-grid">
+            <div class="wallet-card">
+                <h3 style="color:#f3b33d;">💰 Your Balance</h3>
+                <div style="font-size: 2rem; color:#ffdd99; margin: 20px 0;" id="walletBalanceDisplay">0.00 USDT</div>
+                <button class="copy-btn" id="refreshBalanceBtn">⟳ Refresh Balance</button>
+            </div>
             
-            if (packet.action === "sync") {
-                countdownValue = packet.data.clock_timer;
-                document.getElementById("clock-sec").innerText = packet.data.clock_timer;
-                document.getElementById("table-status").innerText = packet.data.table_status;
-                document.getElementById("shoe-lbl").innerText = `Shoe Round: ${packet.data.round_counter} / 60`;
+            <div class="wallet-card">
+                <h3 style="color:#f3b33d;">📥 Deposit USDT (TRC-20)</h3>
+                <div class="trc20-address" id="depositAddress">
+                    TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg
+                </div>
+                <button class="copy-btn" id="copyAddressBtn">📋 Copy Address</button>
+                <p style="color:#a2c9bc; font-size:0.7rem; margin-top:10px;">Send only USDT on TRC-20 network</p>
+            </div>
+            
+            <div class="wallet-card">
+                <h3 style="color:#f3b33d;">📤 Withdraw USDT</h3>
+                <input type="text" id="withdrawAddress" class="auth-input-small" placeholder="Your TRC-20 Address" style="width:100%; margin:10px 0;">
+                <input type="number" id="withdrawAmount" class="auth-input-small" placeholder="Amount (USDT)" step="1" min="10" style="width:100%; margin:10px 0;">
+                <button class="copy-btn" id="withdrawBtn">Request Withdrawal</button>
+                <div id="withdrawMsg" class="error-msg"></div>
+            </div>
+        </div>
+    </div>
 
-                if (packet.data.clock_timer === 0) {
-                    document.getElementById("visualFace").className = "anime-face shuffling";
+    <!-- History Panel -->
+    <div id="historyPanel" class="content-panel">
+        <div class="wallet-card" style="padding: 20px;">
+            <h3 style="color:#f3b33d; margin-bottom: 20px;">📜 Transaction History</h3>
+            <div id="transactionHistoryList" class="history-list">
+                <div style="text-align:center; color:#9dc2b5;">Login to see history</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============================================
+    // STORAGE & CONFIG
+    // ============================================
+    const USERS_KEY = 'cryptobet_users';
+    const SESSIONS_KEY = 'cryptobet_session';
+    const TRANSACTIONS_KEY = 'cryptobet_transactions';
+    const DEPOSIT_ADDRESS = 'TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg';
+    
+    let currentSession = null;
+    let currentUserData = null;
+    let bettingSlip = [];
+    let currentLeagueFilter = 'all';
+    
+    const MATCHES = [
+        { id: 1, home: "Manchester City", away: "Arsenal", league: "Premier League", odds: { home: 2.10, draw: 3.40, away: 3.50 } },
+        { id: 2, home: "Liverpool", away: "Chelsea", league: "Premier League", odds: { home: 1.85, draw: 3.70, away: 4.20 } },
+        { id: 3, home: "Real Madrid", away: "Barcelona", league: "La Liga", odds: { home: 2.20, draw: 3.50, away: 3.20 } },
+        { id: 4, home: "Bayern Munich", away: "Borussia Dortmund", league: "Bundesliga", odds: { home: 1.75, draw: 4.00, away: 4.50 } },
+        { id: 5, home: "Inter Milan", away: "AC Milan", league: "Serie A", odds: { home: 2.30, draw: 3.30, away: 3.10 } },
+        { id: 6, home: "Atletico Madrid", away: "Sevilla", league: "La Liga", odds: { home: 1.90, draw: 3.40, away: 4.50 } },
+        { id: 7, home: "Tottenham", away: "Newcastle", league: "Premier League", odds: { home: 1.95, draw: 3.80, away: 3.90 } },
+        { id: 8, home: "Leverkusen", away: "RB Leipzig", league: "Bundesliga", odds: { home: 2.40, draw: 3.60, away: 2.80 } },
+        { id: 9, home: "Juventus", away: "Napoli", league: "Serie A", odds: { home: 2.50, draw: 3.20, away: 2.90 } },
+        { id: 10, home: "PSG", away: "Marseille", league: "Ligue 1", odds: { home: 1.55, draw: 4.20, away: 6.00 } }
+    ];
+    
+    // Initialize
+    function init() {
+        if (!localStorage.getItem(USERS_KEY)) {
+            localStorage.setItem(USERS_KEY, JSON.stringify([]));
+        }
+        if (!localStorage.getItem(TRANSACTIONS_KEY)) {
+            localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify([]));
+        }
+        checkSession();
+        attachEventListeners();
+    }
+    
+    function attachEventListeners() {
+        // Tab switching
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const panelId = tab.dataset.panel;
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelectorAll('.content-panel').forEach(p => p.classList.remove('active'));
+                document.getElementById(`${panelId}Panel`).classList.add('active');
+                
+                if (panelId === 'wallet' && currentUserData) {
+                    document.getElementById('walletBalanceDisplay').innerText = currentUserData.balance.toFixed(2);
                 }
-                gameHistoryLog = packet.data.game_history;
-                drawRoadmaps();
-            }
-
-            if (packet.action === "deal_reveal") {
-                renderServerCards(packet.data.cards_data);
-            }
-        };
-
-        function renderServerCards(cardsData) {
-            document.getElementById('p-row').innerHTML = ""; 
-            document.getElementById('b-row').innerHTML = "";
-
-            let pInit1 = (cardsData.pHand && cardsData.pHand[0]) ? cardsData.pHand[0].val : 0;
-            let pInit2 = (cardsData.pHand && cardsData.pHand[1]) ? cardsData.pHand[1].val : 0;
-            let bInit1 = (cardsData.bHand && cardsData.bHand[0]) ? cardsData.bHand[0].val : 0;
-            let bInit2 = (cardsData.bHand && cardsData.bHand[1]) ? cardsData.bHand[1].val : 0;
-
-            let steps = [
-                { t: 500, target: 'p-row', card: cardsData.pHand ? cardsData.pHand[0] : null, score: pInit1, side: 'P' },
-                { t: 1000, target: 'b-row', card: cardsData.bHand ? cardsData.bHand[0] : null, score: bInit1, side: 'B' },
-                { t: 1500, target: 'p-row', card: cardsData.pHand ? cardsData.pHand[1] : null, score: (pInit1 + pInit2) % 10, side: 'P' },
-                { t: 2000, target: 'b-row', card: cardsData.bHand ? cardsData.bHand[1] : null, score: (bInit1 + bInit2) % 10, side: 'B' }
-            ];
-
-            if(cardsData.pHand && cardsData.pHand.length > 2) steps.push({ t: 2500, target: 'p-row', card: cardsData.pHand[2], score: cardsData.pScore, side: 'P' });
-            if(cardsData.bHand && cardsData.bHand.length > 2) steps.push({ t: 3000, target: 'b-row', card: cardsData.bHand[2], score: cardsData.bScore, side: 'B' });
-
-            steps.forEach(s => {
-                if (!s.card) return;
-                setTimeout(() => {
-                    let el = document.createElement('div'); el.className = s.card.css; el.innerText = s.card.text;
-                    document.getElementById(s.target).appendChild(el);
-                    setTimeout(() => el.className += " flipped", 40);
-                    if(s.side === 'P') document.getElementById('p-point').innerText = s.score;
-                    if(s.side === 'B') document.getElementById('b-point').innerText = s.score;
-                }, s.t);
-            });
-
-            setTimeout(() => {
-                document.getElementById("visualFace").className = "anime-face win";
-                document.getElementById("table-status").innerText = `${cardsData.verdictText}`;
-
-                let totalBetPlaced = Object.values(activeWagers).reduce((a,b)=>a+b,0);
-                if (totalBetPlaced > 0) {
-                    let log = document.getElementById("logTray");
-                    log.innerHTML += `Round Ended - Bet: ${totalBetPlaced}U | Result: ${cardsData.winner}<br>`;
-                    log.scrollTop = log.scrollHeight;
+                if (panelId === 'history' && currentUserData) {
+                    loadTransactionHistory();
                 }
-
-                previousBetsMap = { ...activeWagers };
-                activeWagers = { PLAYER: 0, BANKER: 0, TIE: 0, P_PAIR: 0, B_PAIR: 0, SUPER6: 0, PANDA8: 0 };
-                updateVisuals();
-            }, 4000);
-        }
-
-        function resetCanvasGrids() {
-            bCtx.clearRect(0,0,beadCanvas.width,beadCanvas.height); bCtx.strokeStyle = "#e8e8e8"; bCtx.lineWidth = 1;
-            for(let i=0;i<=14;i++){bCtx.beginPath();bCtx.moveTo(i*cell,0);bCtx.lineTo(i*cell,70);bCtx.stroke();}
-            for(let j=0;j<=6;j++){bCtx.beginPath();bCtx.moveTo(0,j*cell);bCtx.lineTo(160,j*cell);bCtx.stroke();}
-            brCtx.clearRect(0,0,bigCanvas.width,bigCanvas.height); brCtx.strokeStyle = "#e8e8e8"; brCtx.lineWidth = 1;
-            for(let i=0; i<=16; i++){brCtx.beginPath();brCtx.moveTo(i*cell,0);brCtx.lineTo(i*cell,70);brCtx.stroke();}
-            for(let j=0; j<=6; j++){brCtx.beginPath();brCtx.moveTo(0,j*cell);brCtx.lineTo(180,j*cell);brCtx.stroke();}
-        }
-
-        function selectChip(val, element) {
-            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-            element.classList.add('active');
-            selectedChip = val;
-        }
-
-        function addBet(target) {
-            if(countdownValue <= 1) return; 
-            let totalBets = Object.values(activeWagers).reduce((a,b)=>a+b, 0);
-            if (totalBets + selectedChip > maxBetLimit) return;
-            if (walletBalance >= selectedChip) {
-                walletBalance -= selectedChip;
-                activeWagers[target] += selectedChip;
-                updateVisuals();
-            }
-        }
-
-        function applyRebet() {
-            if (!previousBetsMap) return;
-            let totalCost = Object.values(previousBetsMap).reduce((a,b)=>a+b,0);
-            if (walletBalance >= totalCost) {
-                walletBalance -= totalCost;
-                activeWagers = { ...previousBetsMap };
-                updateVisuals();
-            }
-        }
-
-        function applyDouble() {
-            let totalBets = Object.values(activeWagers).reduce((a,b)=>a+b, 0);
-            if (walletBalance >= totalBets) {
-                walletBalance -= totalBets;
-                for (let key in activeWagers) { activeWagers[key] *= 2; }
-                updateVisuals();
-            }
-        }
-
-        function updateVisuals() {
-            document.getElementById("user-bal").innerText = walletBalance;
-            for (let key in activeWagers) {
-                let badge = document.getElementById(`lbl-${key}`);
-                badge.innerText = activeWagers[key];
-                badge.style.display = activeWagers[key] > 0 ? "block" : "none";
-            }
-        }
-
-        function drawRoadmaps() {
-            resetCanvasGrids();
-            for(let i=0; i<gameHistoryLog.length; i++) {
-                let r = i % 6; let c = Math.floor(i / 6);
-                let x = c * cell + cell/2; let y = r * cell + cell/2;
-                bCtx.beginPath(); bCtx.arc(x, y, 4, 0, 2*Math.PI);
-                bCtx.fillStyle = (gameHistoryLog[i]==="P") ? "#0066ff" : (gameHistoryLog[i]==="B" ? "#ff3333" : "#00cc44");
-                bCtx.fill();
-            }
-            let columns = []; let curr = []; let last = "";
-            gameHistoryLog.forEach(out => {
-                if (out === "T") return;
-                if (out === last && curr.length < 6) { curr.push(out); } 
-                else { if (curr.length > 0) columns.push(curr); curr = [out]; last = out; }
             });
-            if (curr.length > 0) columns.push(curr);
-            columns.forEach((col, cIdx) => {
-                if (col.length === 0 || cIdx >= 16) return;
-                col.forEach((type, rIdx) => {
-                    let x = cIdx * cell + cell/2; let y = rIdx * cell + cell/2;
-                    brCtx.beginPath(); brCtx.arc(x, y, 3.5, 0, 2*Math.PI);
-                    brCtx.strokeStyle = (type === "P") ? "#0066ff" : "#ff3333";
-                    brCtx.lineWidth = 1; brCtx.stroke();
-                });
+        });
+        
+        // League filters
+        document.querySelectorAll('.league-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.league-filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentLeagueFilter = btn.dataset.league;
+                if (currentUserData) renderMatches();
             });
+        });
+        
+        // Clear slip button
+        const clearBtn = document.getElementById('clearSlipBtn');
+        if (clearBtn) clearBtn.addEventListener('click', clearBetSlip);
+        
+        // Place bets button
+        const placeBtn = document.getElementById('placeBetsBtn');
+        if (placeBtn) placeBtn.addEventListener('click', placeBets);
+        
+        // Wallet buttons
+        const copyBtn = document.getElementById('copyAddressBtn');
+        if (copyBtn) copyBtn.addEventListener('click', copyAddress);
+        
+        const withdrawBtn = document.getElementById('withdrawBtn');
+        if (withdrawBtn) withdrawBtn.addEventListener('click', handleWithdraw);
+        
+        const refreshBalanceBtn = document.getElementById('refreshBalanceBtn');
+        if (refreshBalanceBtn) refreshBalanceBtn.addEventListener('click', refreshBalance);
+    }
+    
+    function renderAuthSection() {
+        const authSection = document.getElementById('authSection');
+        if (currentSession && currentUserData) {
+            authSection.innerHTML = `
+                <div class="user-info">
+                    <span>👤 ${currentUserData.username}</span>
+                    <span class="balance">💰 ${currentUserData.balance.toFixed(2)} USDT</span>
+                    <button class="logout-btn" id="logoutBtn">Logout</button>
+                </div>
+            `;
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) logoutBtn.addEventListener('click', logout);
+            
+            if (document.getElementById('walletBalanceDisplay')) {
+                document.getElementById('walletBalanceDisplay').innerText = currentUserData.balance.toFixed(2);
+            }
+            renderMatches();
+            renderBetSlip();
+        } else {
+            authSection.innerHTML = `
+                <div class="auth-section">
+                    <input type="text" id="loginUsername" class="auth-input-small" placeholder="Username">
+                    <input type="password" id="loginPassword" class="auth-input-small" placeholder="Password">
+                    <button class="auth-btn-small" id="loginBtn">Login</button>
+                    <button class="auth-btn-small outline" id="signupShowBtn">Sign Up</button>
+                </div>
+            `;
+            const loginBtn = document.getElementById('loginBtn');
+            const signupBtn = document.getElementById('signupShowBtn');
+            if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+            if (signupBtn) signupBtn.addEventListener('click', showSignupForm);
+            
+            const matchesContainer = document.getElementById('matchesContainer');
+            if (matchesContainer) {
+                matchesContainer.innerHTML = '<div style="text-align:center; padding:40px; color:#a2c9bc;">🔐 Login to see matches</div>';
+            }
         }
-
-        resetCanvasGrids();
-    </script>
+    }
+    
+    function showSignupForm() {
+        const authSection = document.getElementById('authSection');
+        authSection.innerHTML = `
+            <div class="auth-section">
+                <input type="text" id="signupUsername" class="auth-input-small" placeholder="Username">
+                <input type="email" id="signupEmail" class="auth-input-small" placeholder="Email">
+                <input type="password" id="signupPassword" class="auth-input-small" placeholder="Password">
+                <input type="password" id="signupConfirm" class="auth-input-small" placeholder="Confirm">
+                <button class="auth-btn-small" id="signupBtn">Create</button>
+                <button class="auth-btn-small outline" id="backToLoginBtn">Back</button>
+            </div>
+        `;
+        const signupBtn = document.getElementById('signupBtn');
+        const backBtn = document.getElementById('backToLoginBtn');
+        if (signupBtn) signupBtn.addEventListener('click', handleSignup);
+        if (backBtn) backBtn.addEventListener('click', () => renderAuthSection());
+    }
+    
+    function checkSession() {
+        const session = localStorage.getItem(SESSIONS_KEY);
+        if (session) {
+            currentSession = JSON.parse(session);
+            loadUserData(currentSession.username);
+        }
+        renderAuthSection();
+    }
+    
+    function loadUserData(username) {
+        const users = JSON.parse(localStorage.getItem(USERS_KEY));
+        currentUserData = users.find(u => u.username === username);
+    }
+    
+    function saveUserData() {
+        const users = JSON.parse(localStorage.getItem(USERS_KEY));
+        const index = users.findIndex(u => u.username === currentUserData.username);
+        if (index !== -1) {
+            users[index] = currentUserData;
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        }
+        renderAuthSection();
+        if (document.getElementById('walletBalanceDisplay')) {
+            document.getElementById('walletBalanceDisplay').innerText = currentUserData.balance.toFixed(2);
+        }
+    }
+    
+    function handleSignup() {
+        const username = document.getElementById('signupUsername').value.trim();
+        const email = document.getElementById('signupEmail').value.trim();
+        const password = document.getElementById('signupPassword').value;
+        const confirm = document.getElementById('signupConfirm').value;
+        
+        if (!username || !email || !password) {
+            alert('All fields required');
+            return;
+        }
+        if (password !== confirm) {
+            alert('Passwords do not match');
+            return;
+        }
+        if (password.length < 4) {
+            alert('Password must be at least 4 characters');
+            return;
+        }
+        
+        const users = JSON.parse(localStorage.getItem(USERS_KEY));
+        if (users.find(u => u.username === username)) {
+            alert('Username already exists');
+            return;
+        }
+        
+        users.push({
+            username, email, password, balance: 0,
+            createdAt: new Date().toISOString()
+        });
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        alert('Account created! Please login.');
+        renderAuthSection();
+    }
+    
+    function handleLogin() {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        
+        if (!username || !password) {
+            alert('Enter username and password');
+            return;
+        }
+        
+        const users = JSON.parse(localStorage.getItem(USERS_KEY));
+        let user = users.find(u => u.username === username && u.password === password);
+        
+        if (!user) {
+            if (confirm(`User "${username}" not found. Create new account?`)) {
+                user = {
+                    username, email: `${username}@example.com`, password, balance: 0,
+                    createdAt: new Date().toISOString()
+                };
+                users.push(user);
+                localStorage.setItem(USERS_KEY, JSON.stringify(users));
+                alert(`Account created! Balance: 0 USDT. Type simulateDeposit(100) in console to add funds.`);
+            } else {
+                alert('Invalid credentials');
+                return;
+            }
+        }
+        
+        currentSession = { username: user.username, loginTime: Date.now() };
+        localStorage.setItem(SESSIONS_KEY, JSON.stringify(currentSession));
+        currentUserData = user;
+        renderAuthSection();
+        document.querySelector('.nav-tab[data-panel="betting"]').click();
+    }
+    
+    function logout() {
+        localStorage.removeItem(SESSIONS_KEY);
+        currentSession = null;
+        currentUserData = null;
+        bettingSlip = [];
+        renderAuthSection();
+        renderBetSlip();
+    }
+    
+    function copyAddress() {
+        navigator.clipboard.writeText(DEPOSIT_ADDRESS);
+        alert('Address copied! Send USDT TRC-20 only.');
+    }
+    
+    function handleWithdraw() {
+        if (!currentUserData) { alert('Login first'); return; }
+        
+        const address = document.getElementById('withdrawAddress').value.trim();
+        const amount = parseFloat(document.getElementById('withdrawAmount').value);
+        
+        if (!address) { document.getElementById('withdrawMsg').innerText = 'Enter wallet address'; return; }
+        if (isNaN(amount) || amount < 10) { document.getElementById('withdrawMsg').innerText = 'Minimum 10 USDT'; return; }
+        if (amount > currentUserData.balance) { document.getElementById('withdrawMsg').innerText = `Insufficient balance`; return; }
+        
+        currentUserData.balance -= amount;
+        saveUserData();
+        
+        const transactions = JSON.parse(localStorage.getItem(TRANSACTIONS_KEY));
+        transactions.push({
+            type: 'withdrawal', amount, address, status: 'pending',
+            timestamp: new Date().toISOString(), username: currentUserData.username
+        });
+        localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(transactions));
+        
+        alert(`Withdrawal requested: ${amount} USDT to ${address}`);
+        document.getElementById('withdrawAddress').value = '';
+        document.getElementById('withdrawAmount').value = '';
+        document.getElementById('withdrawMsg').innerText = '';
+        if (document.getElementById('walletBalanceDisplay')) {
+            document.getElementById('walletBalanceDisplay').innerText = currentUserData.balance.toFixed(2);
+        }
+        loadTransactionHistory();
+    }
+    
+    function refreshBalance() {
+        if (currentUserData) {
+            alert(`Balance: ${currentUserData.balance.toFixed(2)} USDT`);
+        } else { alert('Login first'); }
+    }
+    
+    window.simulateDeposit = function(amount) {
+        if (!currentUserData) { alert('Login first'); return; }
+        currentUserData.balance += amount;
+        saveUserData();
+        
+        const transactions = JSON.parse(localStorage.getItem(TRANSACTIONS_KEY));
+        transactions.push({
+            type: 'deposit', amount, status: 'completed',
+            timestamp: new Date().toISOString(), username: currentUserData.username,
+            txid: '0x' + Math.random().toString(36).substr(2, 10)
+        });
+        localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(transactions));
+        
+        alert(`+${amount} USDT added! New balance: ${currentUserData.balance.toFixed(2)} USDT`);
+        if (document.getElementById('walletBalanceDisplay')) {
+            document.getElementById('walletBalanceDisplay').innerText = currentUserData.balance.toFixed(2);
+        }
+        loadTransactionHistory();
+        renderAuthSection();
+    };
+    
+    function loadTransactionHistory() {
+        if (!currentUserData) {
+            document.getElementById('transactionHistoryList').innerHTML = '<div style="text-align:center; color:#9dc2b5;">Login to see history</div>';
+            return;
+        }
+        
+        const transactions = JSON.parse(localStorage.getItem(TRANSACTIONS_KEY));
+        const userTxs = transactions.filter(t => t.username === currentUserData.username).reverse();
+        
+        const container = document.getElementById('transactionHistoryList');
+        if (userTxs.length === 0) {
+            container.innerHTML = '<div style="text-align:center; color:#9dc2b5;">No transactions yet</div>';
+            return;
+        }
+        
+        container.innerHTML = userTxs.slice(0, 20).map(tx => `
+            <div class="history-item">
+                <div><strong style="color:${tx.type === 'deposit' ? '#4caf50' : '#ff9800'}">${tx.type.toUpperCase()}</strong><br><small>${new Date(tx.timestamp).toLocaleString()}</small></div>
+                <div><strong>${tx.amount} USDT</strong><br><small>${tx.status || 'completed'}</small></div>
+            </div>
+        `).join('');
+    }
+    
+    function renderMatches() {
+        if (!currentUserData) return;
+        const container = document.getElementById('matchesContainer');
+        const filtered = currentLeagueFilter === 'all' ? MATCHES : MATCHES.filter(m => m.league === currentLeagueFilter);
+        
+        container.innerHTML = filtered.map(match => `
+            <div class="match-card">
+                <div class="match-header"><span class="league">${match.league}</span></div>
+                <div class="teams">
+                    <div class="team-name">${match.home}</div>
+                    <div class="vs">VS</div>
+                    <div class="team-name">${match.away}</div>
+                </div>
+                <div class="odds-panel">
+                    <div class="odd-card" data-matchid="${match.id}" data-type="home" data-odds="${match.odds.home}" data-home="${match.home}" data-away="${match.away}">
+                        <div class="odd-value">${match.odds.home.toFixed(2)}</div>
+                        <div>HOME</div>
+                    </div>
+                    <div class="odd-card" data-matchid="${match.id}" data-type="draw" data-odds="${match.odds.draw}" data-home="${match.home}" data-away="${match.away}">
+                        <div class="odd-value">${match.odds.draw.toFixed(2)}</div>
+                        <div>DRAW</div>
+                    </div>
+                    <div class="odd-card" data-matchid="${match.id}" data-type="away" data-odds="${match.odds.away}" data-home="${match.home}" data-away="${match.away}">
+                        <div class="odd-value">${match.odds.away.toFixed(2)}</div>
+                        <div>AWAY</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Attach click handlers to odd cards
+        document.querySelectorAll('.odd-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const matchId = parseInt(card.dataset.matchid);
+                const betType = card.dataset.type;
+                const odds = parseFloat(card.dataset.odds);
+                const home = card.dataset.home;
+                const away = card.dataset.away;
+                addToBetSlip(matchId, betType, odds, home, away);
+            });
+        });
+    }
+    
+    function addToBetSlip(matchId, betType, odds, home, away) {
+        if (!currentUserData) { alert('Login first'); return; }
+        
+        const existing = bettingSlip.findIndex(b => b.matchId === matchId && b.betType === betType);
+        if (existing !== -1) {
+            bettingSlip[existing] = { matchId, betType, odds, home, away, stake: bettingSlip[existing].stake };
+        } else {
+            bettingSlip.push({ matchId, betType, odds, home, away, stake: 10 });
+        }
+        renderBetSlip();
+    }
+    
+    function renderBetSlip() {
+        const container = document.getElementById('betSlipList');
+        if (bettingSlip.length === 0) {
+            container.innerHTML = '<div style="text-align:center; color:#9dc2b5; padding:20px;">Tap odds to add bets</div>';
+            return;
+        }
+        
+        container.innerHTML = bettingSlip.map((bet, idx) => `
+            <div class="slip-item">
+                <div><strong>${bet.home} vs ${bet.away}</strong><br>${bet.betType.toUpperCase()} @ ${bet.odds.toFixed(2)}</div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="number" value="${bet.stake}" min="1" step="1" class="stake-input" data-idx="${idx}">
+                    <button class="remove-bet" data-idx="${idx}">✖</button>
+                </div>
+            </div>
+        `).join('');
+        
+        document.querySelectorAll('.stake-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const idx = parseInt(input.dataset.idx);
+                bettingSlip[idx].stake = parseFloat(input.value) || 1;
+                renderBetSlip();
+            });
+        });
+        
+        document.querySelectorAll('.remove-bet').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(btn.dataset.idx);
+                bettingSlip.splice(idx, 1);
+                renderBetSlip();
+            });
+        });
+    }
+    
+    function clearBetSlip() {
+        bettingSlip = [];
+        renderBetSlip();
+    }
+    
+    function placeBets() {
+        if (!currentUserData) { alert('Login first'); return; }
+        if (bettingSlip.length === 0) { alert('Add bets first'); return; }
+        
+        let totalStake = bettingSlip.reduce((sum, b) => sum + b.stake, 0);
+        if (totalStake > currentUserData.balance) {
+            alert(`Insufficient balance! Need ${totalStake} USDT, have ${currentUserData.balance.toFixed(2)} USDT`);
+            return;
+        }
+        
+        currentUserData.balance -= totalStake;
+        saveUserData();
+        
+        let potentialWinnings = bettingSlip.reduce((sum, b) => sum + (b.stake * b.odds), 0);
+        
+        const transactions = JSON.parse(localStorage.getItem(TRANSACTIONS_KEY));
+        bettingSlip.forEach(bet => {
+            transactions.push({
+                type: 'bet', amount: bet.stake, potentialWin: bet.stake * bet.odds,
+                match: `${bet.home} vs ${bet.away}`, selection: bet.betType, odds: bet.odds,
+                timestamp: new Date().toISOString(), username: currentUserData.username, status: 'active'
+            });
+        });
+        localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(transactions));
+        
+        alert(`✅ Bets placed!\nStake: ${totalStake} USDT\nPotential win: ${potentialWinnings.toFixed(2)} USDT`);
+        bettingSlip = [];
+        renderBetSlip();
+        loadTransactionHistory();
+    }
+    
+    init();
+    console.log('%c🚀 Mobile ready! Use simulateDeposit(100) for test funds', 'color: #f3b33d; font-size: 14px;');
+</script>
 </body>
 </html>
