@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, sans-serif;
+        }
+        body {
+            background: #0a0a0f;
+            padding: 20px;
+            color: white;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: #1a1a2e;
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #ffd700;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #14141f;
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #ffd70040;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: #1a1a2e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            background: #ffd700;
+            color: black;
+        }
+        .tab-content {
+            display: none;
+            background: #14141f;
+            border-radius: 24px;
+            padding: 20px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #2a2a35;
+        }
+        th {
+            color: #ffd700;
+        }
+        input, select {
+            background: #0a0a10;
+            border: 1px solid #ffd700;
+            border-radius: 8px;
+            padding: 8px;
+            color: white;
+        }
+        button {
+            background: #ffd700;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .admin-secret {
+            background: #2a2a1a;
+            padding: 10px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🔐 Admin Panel</h1>
+        <div class="admin-secret">
+            🔑 Admin Secret Key: <strong>ADMIN_SECRET_123</strong> (use for all admin actions)
+        </div>
+    </div>
+
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-number" id="totalUsers">0</div><div>Total Users</div></div>
+        <div class="stat-card"><div class="stat-number" id="totalDeposits">0</div><div>Total Deposits (USDT)</div></div>
+        <div class="stat-card"><div class="stat-number" id="totalWithdrawals">0</div><div>Total Withdrawals (USDT)</div></div>
+        <div class="stat-card"><div class="stat-number" id="totalBets">0</div><div>Total Bets (USDT)</div></div>
+        <div class="stat-card"><div class="stat-number" id="pendingDeposits">0</div><div>Pending Deposits</div></div>
+        <div class="stat-card"><div class="stat-number" id="pendingWithdrawals">0</div><div>Pending Withdrawals</div></div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="users">👥 Users</button>
+        <button class="tab-btn" data-tab="deposits">💰 Deposits</button>
+        <button class="tab-btn" data-tab="withdrawals">📤 Withdrawals</button>
+        <button class="tab-btn" data-tab="bets">🎲 Bets</button>
+        <button class="tab-btn" data-tab="assign">📥 Assign Deposit</button>
+    </div>
+
+    <div id="usersTab" class="tab-content active">
+        <h3>Registered Users</h3>
+        <table id="usersTable">
+            <thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Balance</th><th>Joined</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="depositsTab" class="tab-content">
+        <h3>Deposit History</h3>
+        <table id="depositsTable">
+            <thead><tr><th>ID</th><th>User ID</th><th>Amount</th><th>TXID</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="withdrawalsTab" class="tab-content">
+        <h3>Withdrawal Requests</h3>
+        <table id="withdrawalsTable">
+            <thead><tr><th>ID</th><th>User ID</th><th>Amount</th><th>Wallet Address</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="betsTab" class="tab-content">
+        <h3>Bet History</h3>
+        <table id="betsTable">
+            <thead><tr><th>ID</th><th>User ID</th><th>Stake</th><th>Odds</th><th>Potential Win</th><th>Date</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="assignTab" class="tab-content">
+        <h3>Assign Pending Deposit to User</h3>
+        <div style="margin-top: 20px;">
+            <label>Deposit ID:</label>
+            <input type="number" id="assignDepositId" placeholder="Deposit ID">
+            <label>User ID:</label>
+            <input type="number" id="assignUserId" placeholder="User ID">
+            <label>Admin Key:</label>
+            <input type="password" id="assignAdminKey" placeholder="ADMIN_SECRET_123">
+            <button onclick="assignDeposit()">Assign Deposit</button>
+        </div>
+        <div style="margin-top: 20px;">
+            <h4>Manual Deposit</h4>
+            <label>User ID:</label>
+            <input type="number" id="manualUserId" placeholder="User ID">
+            <label>Amount (USDT):</label>
+            <input type="number" id="manualAmount" placeholder="Amount">
+            <label>Admin Key:</label>
+            <input type="password" id="manualAdminKey" placeholder="ADMIN_SECRET_123">
+            <button onclick="manualDeposit()">Add Manual Deposit</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ADMIN_KEY = "ADMIN_SECRET_123";
+
+    async function loadStats() {
+        const res = await fetch('/api/admin/stats');
+        const stats = await res.json();
+        document.getElementById('totalUsers').innerText = stats.totalUsers;
+        document.getElementById('totalDeposits').innerText = stats.totalDeposits.toFixed(2);
+        document.getElementById('totalWithdrawals').innerText = stats.totalWithdrawals.toFixed(2);
+        document.getElementById('totalBets').innerText = stats.totalBets.toFixed(2);
+        document.getElementById('pendingDeposits').innerText = stats.pendingDeposits;
+        document.getElementById('pendingWithdrawals').innerText = stats.pendingWithdrawals;
+    }
+
+    async function loadUsers() {
+        const res = await fetch('/api/admin/users');
+        const users = await res.json();
+        const tbody = document.querySelector('#usersTable tbody');
+        tbody.innerHTML = users.map(u => `
+            <tr>
+                <td>${u.id}</td>
+                <td>${u.username}</td>
+                <td>${u.email}</td>
+                <td>${u.balance.toFixed(2)} USDT</td>
+                <td>${new Date(u.createdAt).toLocaleString()}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function loadDeposits() {
+        const res = await fetch('/api/admin/deposits');
+        const deposits = await res.json();
+        const tbody = document.querySelector('#depositsTable tbody');
+        tbody.innerHTML = deposits.map(d => `
+            <tr>
+                <td>${d.id}</td>
+                <td>${d.userId || 'Pending'}</td>
+                <td>${d.amount.toFixed(2)} USDT</td>
+                <td>${d.txid?.substring(0, 20)}...</td>
+                <td>${d.status}</td>
+                <td>${new Date(d.timestamp).toLocaleString()}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function loadWithdrawals() {
+        const res = await fetch('/api/admin/withdrawals');
+        const withdrawals = await res.json();
+        const tbody = document.querySelector('#withdrawalsTable tbody');
+        tbody.innerHTML = withdrawals.map(w => `
+            <tr>
+                <td>${w.id}</td>
+                <td>${w.userId}</td>
+                <td>${w.amount.toFixed(2)} USDT</td>
+                <td>${w.walletAddress}</td>
+                <td>${w.status}</td>
+                <td>${new Date(w.timestamp).toLocaleString()}</td>
+                <td>
+                    ${w.status === 'pending' ? `
+                        <button onclick="approveWithdrawal(${w.id})">Approve</button>
+                        <button onclick="rejectWithdrawal(${w.id})">Reject</button>
+                    ` : '-'}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function loadBets() {
+        const res = await fetch('/api/admin/bets');
+        const bets = await res.json();
+        const tbody = document.querySelector('#betsTable tbody');
+        tbody.innerHTML = bets.map(b => `
+            <tr>
+                <td>${b.id}</td>
+                <td>${b.userId}</td>
+                <td>${b.totalStake.toFixed(2)} USDT</td>
+                <td>${b.totalOdds.toFixed(2)}x</td>
+                <td>${b.potentialWin.toFixed(2)} USDT</td>
+                <td>${new Date(b.timestamp).toLocaleString()}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function approveWithdrawal(id) {
+        const res = await fetch('/api/approve-withdrawal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ withdrawalId: id, adminKey: ADMIN_KEY })
+        });
+        if (res.ok) {
+            alert('Withdrawal approved');
+            loadWithdrawals();
+            loadStats();
+        } else {
+            alert('Error');
+        }
+    }
+
+    async function rejectWithdrawal(id) {
+        const res = await fetch('/api/reject-withdrawal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ withdrawalId: id, adminKey: ADMIN_KEY })
+        });
+        if (res.ok) {
+            alert('Withdrawal rejected');
+            loadWithdrawals();
+            loadStats();
+        } else {
+            alert('Error');
+        }
+    }
+
+    async function assignDeposit() {
+        const depositId = parseInt(document.getElementById('assignDepositId').value);
+        const userId = parseInt(document.getElementById('assignUserId').value);
+        const adminKey = document.getElementById('assignAdminKey').value;
+        
+        const res = await fetch('/api/assign-deposit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ depositId, userId, adminKey })
+        });
+        
+        if (res.ok) {
+            alert('Deposit assigned successfully');
+            loadDeposits();
+            loadUsers();
+            loadStats();
+        } else {
+            alert('Error');
+        }
+    }
+
+    async function manualDeposit() {
+        const userId = parseInt(document.getElementById('manualUserId').value);
+        const amount = parseFloat(document.getElementById('manualAmount').value);
+        const adminKey = document.getElementById('manualAdminKey').value;
+        
+        const res = await fetch('/api/manual-deposit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, amount, adminKey })
+        });
+        
+        if (res.ok) {
+            alert('Manual deposit added');
+            loadUsers();
+            loadDeposits();
+            loadStats();
+        } else {
+            alert('Error');
+        }
+    }
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.tab + 'Tab').classList.add('active');
+            
+            if (btn.dataset.tab === 'users') loadUsers();
+            if (btn.dataset.tab === 'deposits') loadDeposits();
+            if (btn.dataset.tab === 'withdrawals') loadWithdrawals();
+            if (btn.dataset.tab === 'bets') loadBets();
+        });
+    });
+
+    loadStats();
+    loadUsers();
+    loadDeposits();
+    loadWithdrawals();
+    loadBets();
+
+    setInterval(() => {
+        loadStats();
+    }, 30000);
+</script>
+</body>
+</html>
