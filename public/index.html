@@ -241,12 +241,6 @@
             padding: 50px;
             color: #aaa;
         }
-
-        @media (max-width: 700px) {
-            .matches-grid {
-                grid-template-columns: 1fr;
-            }
-        }
     </style>
 </head>
 <body>
@@ -261,10 +255,10 @@
         </div>
     </div>
 
-    <div id="apiStatus" class="api-status loading">🔄 Connecting to iSports API...</div>
+    <div id="apiStatus" class="api-status loading">🔄 Connecting to server...</div>
 
     <div id="matchesContainer" class="matches-grid">
-        <div class="loading">📡 Fetching live matches from iSports API...</div>
+        <div class="loading">📡 Fetching live matches...</div>
     </div>
 
     <div class="bet-slip">
@@ -282,19 +276,13 @@
 
 <script>
 // ============================================================
-// CORRECT iSPORTS API ENDPOINT
-// Endpoint: /sport/football/livescores
-// Your API Key: y6qNrfP7R0qJUh1x
+// CORRECT: Calls YOUR backend server, NOT iSports directly
 // ============================================================
-const ISPORTS_API_KEY = "y6qNrfP7R0qJUh1x";
-const API_BASE = "http://api.isportsapi.com";
 
-// App state
 let balance = 100000;
 let bettingSlip = [];
 let realMatches = [];
 
-// DOM elements
 const balanceDisplay = document.getElementById('balanceDisplay');
 const matchesContainer = document.getElementById('matchesContainer');
 const apiStatusDiv = document.getElementById('apiStatus');
@@ -313,39 +301,32 @@ function loadBalance() {
 }
 
 // ============================================================
-// FETCH REAL LIVE MATCHES FROM iSPORTS API
-// CORRECT ENDPOINT: /sport/football/livescores
+// FETCH LIVE MATCHES - CALLS YOUR BACKEND (NOT iSPORTS)
 // ============================================================
 async function fetchLiveMatches() {
     apiStatusDiv.className = "api-status loading";
-    apiStatusDiv.innerHTML = "🔄 Fetching live matches from iSports API...";
-    matchesContainer.innerHTML = '<div class="loading">📡 Connecting to iSports API...</div>';
+    apiStatusDiv.innerHTML = "🔄 Fetching live matches...";
+    matchesContainer.innerHTML = '<div class="loading">📡 Connecting to server...</div>';
 
     try {
-        // CORRECT ENDPOINT from documentation
-        const url = `${API_BASE}/sport/football/livescores?api_key=${ISPORTS_API_KEY}`;
-        
-        console.log("Fetching:", url);
-        
-        const response = await fetch(url);
+        // ✅ THIS CALLS YOUR OWN BACKEND SERVER
+        const response = await fetch('/api/livescores');
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            throw new Error(`HTTP ${response.status}`);
         }
 
         const data = await response.json();
         
-        console.log("API Response:", data);
+        console.log("Server response:", data);
 
-        // Check if data has matches
         if (!data || data.length === 0) {
             apiStatusDiv.className = "api-status error";
             apiStatusDiv.innerHTML = "⚠️ No live matches at the moment. Try again later.";
-            matchesContainer.innerHTML = '<div class="loading">⚽ No live matches right now.\n\nLive matches will appear here when games are in progress.</div>';
+            matchesContainer.innerHTML = '<div class="loading">⚽ No live matches right now.</div>';
             return;
         }
 
-        // Process live matches
         realMatches = data.map(match => ({
             id: match.matchId,
             league: match.leagueName || "Football",
@@ -362,15 +343,15 @@ async function fetchLiveMatches() {
         }));
 
         apiStatusDiv.className = "api-status success";
-        apiStatusDiv.innerHTML = `✅ Connected to iSports API • ${realMatches.length} live matches`;
+        apiStatusDiv.innerHTML = `✅ Connected • ${realMatches.length} live matches`;
         
         renderMatches();
 
     } catch (error) {
-        console.error("iSports API Error:", error);
+        console.error("Error:", error);
         apiStatusDiv.className = "api-status error";
-        apiStatusDiv.innerHTML = `❌ API Error: ${error.message}`;
-        matchesContainer.innerHTML = `<div class="loading">❌ Failed to fetch matches\n\nError: ${error.message}\n\nMake sure you have activated your free trial or subscription.</div>`;
+        apiStatusDiv.innerHTML = `❌ Error: ${error.message}`;
+        matchesContainer.innerHTML = `<div class="loading">❌ Failed to fetch matches</div>`;
     }
 }
 
@@ -535,8 +516,7 @@ window.simulateDeposit = (amount) => {
 loadBalance();
 fetchLiveMatches();
 
-console.log("✅ iSPORTS API - Correct endpoint: /sport/football/livescores");
-console.log("🔑 API Key: y6qNrfP7R0qJUh1x");
+console.log("✅ Frontend connected to backend proxy at /api/livescores");
 </script>
 </body>
 </html>
