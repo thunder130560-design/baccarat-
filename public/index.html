@@ -276,7 +276,7 @@
 
 <script>
 // ============================================================
-// CORRECT: Calls YOUR backend server, NOT iSports directly
+// CORRECTED VERSION - Calls backend proxy, handles API response
 // ============================================================
 
 let balance = 100000;
@@ -301,7 +301,7 @@ function loadBalance() {
 }
 
 // ============================================================
-// FETCH LIVE MATCHES - CALLS YOUR BACKEND (NOT iSPORTS)
+// FETCH LIVE MATCHES FROM BACKEND PROXY
 // ============================================================
 async function fetchLiveMatches() {
     apiStatusDiv.className = "api-status loading";
@@ -309,7 +309,6 @@ async function fetchLiveMatches() {
     matchesContainer.innerHTML = '<div class="loading">📡 Connecting to server...</div>';
 
     try {
-        // ✅ THIS CALLS YOUR OWN BACKEND SERVER
         const response = await fetch('/api/livescores');
         
         if (!response.ok) {
@@ -320,14 +319,16 @@ async function fetchLiveMatches() {
         
         console.log("Server response:", data);
 
-        if (!data || data.length === 0) {
+        // ✅ FIX: Check data.data (not data directly)
+        if (!data || !data.data || data.data.length === 0) {
             apiStatusDiv.className = "api-status error";
             apiStatusDiv.innerHTML = "⚠️ No live matches at the moment. Try again later.";
             matchesContainer.innerHTML = '<div class="loading">⚽ No live matches right now.</div>';
             return;
         }
 
-        realMatches = data.map(match => ({
+        // ✅ FIX: Use data.data (not data)
+        realMatches = data.data.map(match => ({
             id: match.matchId,
             league: match.leagueName || "Football",
             home: match.homeTeamName || "Home Team",
