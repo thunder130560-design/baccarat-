@@ -8,10 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'ADMIN_SECRET_123';
-
-// YOUR API KEY - REPLACE WITH YOUR REAL KEY
 const API_KEY = "y6qNrfP7R0qJUh1x";
-
 const YOUR_WALLET = "TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg";
 
 app.use(express.json());
@@ -173,95 +170,44 @@ app.get('/api/me', verifyToken, (req, res) => {
 });
 
 // ============================================================
-// iSPORTS API - REAL ENDPOINTS
+// iSPORTS API - LIVE SCORES (WORKING ENDPOINT)
 // ============================================================
 
-// Get upcoming fixtures (matches that haven't started)
-app.get('/api/upcoming-matches', async (req, res) => {
+// Get live scores from your API
+app.get('/api/live-scores', async (req, res) => {
     try {
-        const { date } = req.query;
-        const targetDate = date || new Date().toISOString().split('T')[0];
-        
-        // CORRECT ENDPOINT from your Java code example
-        const url = `http://api.isportsapi.com/sport/football/fixtures?api_key=${API_KEY}&date=${targetDate}`;
-        
-        console.log("Fetching fixtures from:", url);
-        
+        const url = `http://api.isportsapi.com/sport/football/livescores?api_key=${API_KEY}`;
         const response = await fetch(url);
         const data = await response.json();
         
-        console.log("API Response:", data);
+        console.log("Live scores fetched:", data.data ? data.data.length : 0, "matches");
         
-        // Check if API returned an error
-        if (data.code && data.code !== 0) {
-            console.log("API Error:", data.message);
-            return res.json([]);
+        if (data && data.data) {
+            res.json(data.data);
+        } else {
+            res.json([]);
         }
-        
-        // Filter only matches that haven't started
-        let matches = [];
-        if (data && data.data && data.data.length > 0) {
-            matches = data.data.filter(match => 
-                match.status === 'notstarted' || match.status === 'scheduled'
-            );
-        }
-        
-        res.json(matches);
-        
     } catch (error) {
-        console.error("Error fetching fixtures:", error);
-        res.json([]);
+        console.error("Error fetching live scores:", error);
+        res.status(500).json({ error: error.message });
     }
 });
 
-// Get odds for a specific match (including Handicap & Over/Under)
+// Get odds for a match
 app.get('/api/match-odds/:matchId', async (req, res) => {
     try {
         const { matchId } = req.params;
-        const { companyId } = req.query;
-        const companies = companyId || '31,8,23';
-        
-        // CORRECT ENDPOINT from your Java code example
-        const url = `http://api.isportsapi.com/sport/football/odds/all?api_key=${API_KEY}&matchId=${matchId}&companyId=${companies}`;
-        
-        console.log("Fetching odds for match:", matchId);
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        if (data.code && data.code !== 0) {
-            console.log("API Error for odds:", data.message);
-            return res.json({ data: [] });
-        }
-        
-        res.json(data);
-        
-    } catch (error) {
-        console.error("Error fetching odds:", error);
-        res.json({ data: [] });
-    }
-});
-
-// Get live odds changes (for real-time updates)
-app.get('/api/odds-changes', async (req, res) => {
-    try {
-        const { matchId, companyId } = req.query;
-        let url = `http://api.isportsapi.com/sport/football/odds/all/changes?api_key=${API_KEY}`;
-        
-        if (matchId) url += `&matchId=${matchId}`;
-        if (companyId) url += `&companyId=${companyId}`;
-        
+        const url = `http://api.isportsapi.com/sport/football/odds/all?api_key=${API_KEY}&matchId=${matchId}&companyId=31`;
         const response = await fetch(url);
         const data = await response.json();
         res.json(data);
-        
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 // ============================================================
-// DEPOSIT & WITHDRAWAL (same as before)
+// DEPOSIT & WITHDRAWAL
 // ============================================================
 
 app.post('/api/manual-deposit', (req, res) => {
@@ -594,16 +540,19 @@ app.get('/api/admin/stats', (req, res) => {
     });
 });
 
+// ============================================================
+// START SERVER
+// ============================================================
+
 app.listen(PORT, () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║     ✅ SOCCER BET SERVER RUNNING (NO FAKE MATCHES)          ║
+║     ✅ SOCCER BET SERVER RUNNING                            ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
-║   📡 API Endpoints:                                         ║
-║   - GET /api/upcoming-matches                               ║
-║   - GET /api/match-odds/:matchId                            ║
-║   - GET /api/odds-changes                                   ║
+║   📡 Endpoints:                                             ║
+║   - GET /api/live-scores  (live matches)                    ║
+║   - GET /api/match-odds/:id (odds)                          ║
 ║                                                              ║
 ║   💰 USDT Wallet: ${YOUR_WALLET}                              ║
 ║                                                              ║
