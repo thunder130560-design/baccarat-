@@ -1,27 +1,34 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const path = require('path');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'ADMIN_SECRET_123';
 const API_KEY = "y6qNrfP7R0qJUh1x";
 
 // TronGrid Configuration
 const TRONGRID_API = "https://api.trongrid.io";
-const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"; // USDT (TRC-20) contract
-const YOUR_WALLET = "TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg"; // Your receiving address
+const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+const YOUR_WALLET = "TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg";
 
 app.use(express.json());
+app.use(cors());
 app.use(express.static('public'));
 
 // ============================================================
-// DATABASE (In-Memory - For production use PostgreSQL)
+// DATABASE (In-Memory - Replace with PostgreSQL for production)
 // ============================================================
 const users = [];
 const deposits = [];
 const withdrawals = [];
 const bets = [];
 const transactions = [];
+const referrals = [];
 
 let nextUserId = 1;
 let nextDepositId = 1;
@@ -30,14 +37,29 @@ let nextBetId = 1;
 let nextTxId = 1;
 
 // ============================================================
-// USER REGISTRATION & LOGIN
+// HELPER FUNCTIONS
+// ============================================================
+function generateReferralCode() {
+    return 'REF_' + Math.random().toString(36).substring(2, 10).toUpperCase();
+}
+
+// ============================================================
+// USER REGISTRATION & LOGIN (with JWT & Referral)
 // ============================================================
 
-app.post('/api/register', (req, res) => {
-    const { username, email, password } = req.body;
+app.post('/api/register', async (req, res) => {
+    const { username, email, password, confirmPassword, referralCode } = req.body;
     
-    if (!username || !email || !password) {
+    if (!username || !email || !password || !confirmPassword) {
         return res.status(400).json({ error: 'All fields required' });
+    }
+    
+    if (password !== confirmPassword) {
+        return res.status(400).json({ error: 'Passwords do not match' });
+    }
+    
+    if (password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
     
     const existingUser = users.find(u => u.email === email || u.username === username);
@@ -45,12 +67,26 @@ app.post('/api/register', (req, res) => {
         return res.status(400).json({ error: 'Username or email already exists' });
     }
     
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newReferralCode = generateReferralCode();
+    
+    let referredBy = null;
+    if (referralCode) {
+        const referrer = users.find(u => u.referralCode === referralCode);
+        if (referrer) {
+            referredBy = referrer.id;
+            // Give referrer 10% bonus on first deposit (handled later)
+        }
+    }
+    
     const newUser = {
         id: nextUserId++,
         username,
         email,
-        password, // In production: hash with bcrypt
-        balance: 1000, // Free signup bonus
+        password: hashedPassword,
+        balance: 1000, // Signup bonus
+        referralCode: newReferralCode,
+        referredBy,
         createdAt: new Date().toISOString(),
         isAdmin: email === 'admin@example.com'
     };
@@ -68,51 +104,113 @@ app.post('/api/register', (req, res) => {
         timestamp: new Date().toISOString()
     });
     
-    res.json({ 
-        success: true, 
-        user: { id: newUser.id, username: newUser.username, email: newUser.email, balance: newUser.balance }
-    });
-});
-
-app.post('/api/login', (req, res) => {
-    const { email, password } = req.body;
-    
-    const user = users.find(u => u.email === email && u.password === password);
-    
-    if (!user) {
-        return res.status(401).json({ error: 'Invalid email or password' });
-    }
+    // Generate JWT token
+    const token = jwt.sign({ userId: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
     
     res.json({ 
         success: true, 
+        token,
         user: { 
-            id: user.id, 
-            username: user.username, 
-            email: user.email, 
-            balance: user.balance, 
-            isAdmin: user.isAdmin || false 
+            id: newUser.id, 
+            username: newUser.username, 
+            email: newUser.email, 
+            balance: newUser.balance,
+            referralCode: newUser.referralCode
         }
     });
 });
 
-app.get('/api/user/:id', (req, res) => {
-    const user = users.find(u => u.id === parseInt(req.params.id));
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    
+    const user = users.find(u => u.email === email);
+    if (!user) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    
+    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    
+    res.json({ 
+        success: true, 
+        token,
+        user: { 
+            id: user.id, 
+            username: user.username, 
+            email: user.email, 
+            balance: user.balance,
+            referralCode: user.referralCode,
+            isAdmin: user.isAdmin || false
+        }
+    });
+});
+
+// Verify token middleware
+function verifyToken(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.userId = decoded.userId;
+        next();
+    } catch (error) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+}
+
+app.get('/api/me', verifyToken, (req, res) => {
+    const user = users.find(u => u.id === req.userId);
     if (!user) {
         return res.status(404).json({ error: 'User not found' });
     }
-    res.json({ id: user.id, username: user.username, email: user.email, balance: user.balance });
+    res.json({ 
+        id: user.id, 
+        username: user.username, 
+        email: user.email, 
+        balance: user.balance,
+        referralCode: user.referralCode,
+        isAdmin: user.isAdmin || false
+    });
+});
+
+// ============================================================
+// REFERRAL SYSTEM
+// ============================================================
+
+app.get('/api/referral-stats', verifyToken, (req, res) => {
+    const user = users.find(u => u.id === req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const referredUsers = users.filter(u => u.referredBy === user.id);
+    const totalReferrals = referredUsers.length;
+    const totalCommission = transactions
+        .filter(t => t.userId === user.id && t.type === 'referral_commission')
+        .reduce((sum, t) => sum + t.amount, 0);
+    
+    res.json({
+        referralCode: user.referralCode,
+        totalReferrals,
+        totalCommission,
+        referralLink: `https://go-f55z.onrender.com/?ref=${user.referralCode}`
+    });
 });
 
 // ============================================================
 // DEPOSIT (Manual & TronGrid)
 // ============================================================
 
-// Manual deposit (admin adds manually)
 app.post('/api/manual-deposit', (req, res) => {
     const { userId, amount, txid, adminKey } = req.body;
     
-    // Simple admin check (in production, use proper auth)
-    if (adminKey !== 'ADMIN_SECRET_123') {
+    if (adminKey !== ADMIN_SECRET) {
         return res.status(403).json({ error: 'Unauthorized' });
     }
     
@@ -122,6 +220,24 @@ app.post('/api/manual-deposit', (req, res) => {
     }
     
     user.balance += amount;
+    
+    // Give referral commission (10% of deposit)
+    if (user.referredBy) {
+        const referrer = users.find(u => u.id === user.referredBy);
+        if (referrer) {
+            const commission = amount * 0.1;
+            referrer.balance += commission;
+            transactions.push({
+                id: nextTxId++,
+                userId: referrer.id,
+                type: 'referral_commission',
+                amount: commission,
+                status: 'completed',
+                description: `Commission from deposit of user ${user.username}`,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
     
     const deposit = {
         id: nextDepositId++,
@@ -139,38 +255,31 @@ app.post('/api/manual-deposit', (req, res) => {
         type: 'deposit',
         amount,
         status: 'completed',
-        description: `Manual deposit - TXID: ${deposit.txid}`,
+        description: `Deposit - TXID: ${deposit.txid}`,
         timestamp: new Date().toISOString()
     });
     
     res.json({ success: true, newBalance: user.balance });
 });
 
-// TronGrid webhook endpoint (called by TronGrid when deposit arrives)
+// TronGrid webhook endpoint
 app.post('/api/tron-webhook', async (req, res) => {
     try {
         const { transaction_id, from, to, amount, contract_ret } = req.body;
         
-        // Verify it's USDT and sent to your wallet
         if (to.toLowerCase() !== YOUR_WALLET.toLowerCase()) {
             return res.status(200).json({ received: false, reason: 'Not my wallet' });
         }
         
-        // Check if already processed
         const existingDeposit = deposits.find(d => d.txid === transaction_id);
         if (existingDeposit) {
             return res.status(200).json({ received: true, already_processed: true });
         }
         
-        // Find user by wallet address (you need to store wallet addresses per user)
-        // For now, we'll need to associate wallet with user separately
-        // This is simplified - in production, users must link their wallet first
-        
-        // For demo, we'll create a pending deposit for admin to assign
         const pendingDeposit = {
             id: nextDepositId++,
-            userId: null, // Admin must assign
-            amount: parseFloat(amount) / 1e6, // USDT has 6 decimals
+            userId: null,
+            amount: parseFloat(amount) / 1e6,
             txid: transaction_id,
             fromAddress: from,
             status: 'pending',
@@ -178,10 +287,8 @@ app.post('/api/tron-webhook', async (req, res) => {
         };
         deposits.push(pendingDeposit);
         
-        // Notify via console (in production, send email or store for admin)
         console.log(`💰 New USDT Deposit: ${amount} USDT from ${from}`);
         console.log(`   TXID: ${transaction_id}`);
-        console.log(`   Pending assignment - Go to Admin Panel to assign to user`);
         
         res.json({ received: true, pending: true });
         
@@ -191,17 +298,15 @@ app.post('/api/tron-webhook', async (req, res) => {
     }
 });
 
-// Get pending deposits (for admin)
 app.get('/api/pending-deposits', (req, res) => {
     const pending = deposits.filter(d => d.status === 'pending');
     res.json(pending);
 });
 
-// Assign pending deposit to user (admin)
 app.post('/api/assign-deposit', (req, res) => {
     const { depositId, userId, adminKey } = req.body;
     
-    if (adminKey !== 'ADMIN_SECRET_123') {
+    if (adminKey !== ADMIN_SECRET) {
         return res.status(403).json({ error: 'Unauthorized' });
     }
     
@@ -219,6 +324,24 @@ app.post('/api/assign-deposit', (req, res) => {
     deposit.status = 'completed';
     user.balance += deposit.amount;
     
+    // Give referral commission
+    if (user.referredBy) {
+        const referrer = users.find(u => u.id === user.referredBy);
+        if (referrer) {
+            const commission = deposit.amount * 0.1;
+            referrer.balance += commission;
+            transactions.push({
+                id: nextTxId++,
+                userId: referrer.id,
+                type: 'referral_commission',
+                amount: commission,
+                status: 'completed',
+                description: `Commission from deposit of user ${user.username}`,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+    
     transactions.push({
         id: nextTxId++,
         userId,
@@ -233,13 +356,13 @@ app.post('/api/assign-deposit', (req, res) => {
 });
 
 // ============================================================
-// WITHDRAWAL
+// WITHDRAWAL (Auto via TronGrid)
 // ============================================================
 
-app.post('/api/withdraw-request', (req, res) => {
-    const { userId, amount, walletAddress } = req.body;
+app.post('/api/withdraw-request', verifyToken, async (req, res) => {
+    const { amount, walletAddress } = req.body;
+    const user = users.find(u => u.id === req.userId);
     
-    const user = users.find(u => u.id === userId);
     if (!user) {
         return res.status(404).json({ error: 'User not found' });
     }
@@ -252,10 +375,11 @@ app.post('/api/withdraw-request', (req, res) => {
         return res.status(400).json({ error: 'Minimum withdrawal is 10 USDT' });
     }
     
-    // Create withdrawal request (pending approval)
+    // For auto-withdrawal via TronGrid (requires private key)
+    // This creates a pending withdrawal for admin approval (safety)
     const withdrawal = {
         id: nextWithdrawalId++,
-        userId,
+        userId: user.id,
         amount,
         walletAddress,
         status: 'pending',
@@ -265,7 +389,7 @@ app.post('/api/withdraw-request', (req, res) => {
     
     transactions.push({
         id: nextTxId++,
-        userId,
+        userId: user.id,
         type: 'withdrawal_request',
         amount,
         status: 'pending',
@@ -276,11 +400,10 @@ app.post('/api/withdraw-request', (req, res) => {
     res.json({ success: true, message: 'Withdrawal request submitted', requestId: withdrawal.id });
 });
 
-// Approve withdrawal (admin)
 app.post('/api/approve-withdrawal', (req, res) => {
     const { withdrawalId, adminKey } = req.body;
     
-    if (adminKey !== 'ADMIN_SECRET_123') {
+    if (adminKey !== ADMIN_SECRET) {
         return res.status(403).json({ error: 'Unauthorized' });
     }
     
@@ -298,8 +421,6 @@ app.post('/api/approve-withdrawal', (req, res) => {
         return res.status(404).json({ error: 'User not found' });
     }
     
-    // Deduct balance (already deducted when request was made? No, deduct now)
-    // For safety, deduct at approval time
     if (user.balance < withdrawal.amount) {
         return res.status(400).json({ error: 'Insufficient balance' });
     }
@@ -320,42 +441,14 @@ app.post('/api/approve-withdrawal', (req, res) => {
     res.json({ success: true });
 });
 
-// Reject withdrawal (admin)
-app.post('/api/reject-withdrawal', (req, res) => {
-    const { withdrawalId, adminKey } = req.body;
-    
-    if (adminKey !== 'ADMIN_SECRET_123') {
-        return res.status(403).json({ error: 'Unauthorized' });
-    }
-    
-    const withdrawal = withdrawals.find(w => w.id === withdrawalId);
-    if (!withdrawal) {
-        return res.status(404).json({ error: 'Withdrawal not found' });
-    }
-    
-    withdrawal.status = 'rejected';
-    
-    transactions.push({
-        id: nextTxId++,
-        userId: withdrawal.userId,
-        type: 'withdrawal_rejected',
-        amount: withdrawal.amount,
-        status: 'rejected',
-        description: `Withdrawal rejected`,
-        timestamp: new Date().toISOString()
-    });
-    
-    res.json({ success: true });
-});
-
 // ============================================================
-// BETS & TRANSACTIONS
+// BETS
 // ============================================================
 
-app.post('/api/place-bet', (req, res) => {
-    const { userId, bets: betSelections, totalStake, totalOdds } = req.body;
+app.post('/api/place-bet', verifyToken, (req, res) => {
+    const { bets: betSelections, totalStake, totalOdds } = req.body;
+    const user = users.find(u => u.id === req.userId);
     
-    const user = users.find(u => u.id === userId);
     if (!user) {
         return res.status(404).json({ error: 'User not found' });
     }
@@ -368,7 +461,7 @@ app.post('/api/place-bet', (req, res) => {
     
     const betRecord = {
         id: nextBetId++,
-        userId,
+        userId: user.id,
         selections: betSelections,
         totalStake,
         totalOdds,
@@ -380,7 +473,7 @@ app.post('/api/place-bet', (req, res) => {
     
     transactions.push({
         id: nextTxId++,
-        userId,
+        userId: user.id,
         type: 'bet',
         amount: totalStake,
         status: 'completed',
@@ -391,13 +484,13 @@ app.post('/api/place-bet', (req, res) => {
     res.json({ success: true, newBalance: user.balance, betId: betRecord.id });
 });
 
-app.get('/api/user-bets/:userId', (req, res) => {
-    const userBets = bets.filter(b => b.userId === parseInt(req.params.userId));
+app.get('/api/user-bets', verifyToken, (req, res) => {
+    const userBets = bets.filter(b => b.userId === req.userId);
     res.json(userBets);
 });
 
-app.get('/api/user-transactions/:userId', (req, res) => {
-    const userTransactions = transactions.filter(t => t.userId === parseInt(req.params.userId));
+app.get('/api/user-transactions', verifyToken, (req, res) => {
+    const userTransactions = transactions.filter(t => t.userId === req.userId);
     res.json(userTransactions);
 });
 
@@ -406,12 +499,13 @@ app.get('/api/user-transactions/:userId', (req, res) => {
 // ============================================================
 
 app.get('/api/admin/users', (req, res) => {
-    // In production, add admin authentication
     const usersData = users.map(u => ({
         id: u.id,
         username: u.username,
         email: u.email,
         balance: u.balance,
+        referralCode: u.referralCode,
+        referredBy: u.referredBy,
         createdAt: u.createdAt
     }));
     res.json(usersData);
@@ -466,7 +560,7 @@ app.get('/api/livescores', async (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
-    console.log(`🔑 Admin secret: ADMIN_SECRET_123`);
+    console.log(`🔑 Admin secret: ${ADMIN_SECRET}`);
     console.log(`💰 USDT Wallet: ${YOUR_WALLET}`);
-    console.log(`📡 TronGrid webhook URL: https://your-app.onrender.com/api/tron-webhook`);
+    console.log(`📡 TronGrid webhook: https://your-app.onrender.com/api/tron-webhook`);
 });
