@@ -48,7 +48,7 @@ function generateReferralCode() {
 // ============================================================
 
 app.post('/api/register', async (req, res) => {
-    const { username, email, password, confirmPassword, referralCode } = req.body;
+    const { username, email, password, confirmPassword, referralCode, walletAddress } = req.body;
     
     if (!username || !email || !password || !confirmPassword) {
         return res.status(400).json({ error: 'All fields required' });
@@ -75,7 +75,6 @@ app.post('/api/register', async (req, res) => {
         const referrer = users.find(u => u.referralCode === referralCode);
         if (referrer) {
             referredBy = referrer.id;
-            // Give referrer 10% bonus on first deposit (handled later)
         }
     }
     
@@ -84,9 +83,10 @@ app.post('/api/register', async (req, res) => {
         username,
         email,
         password: hashedPassword,
-        balance: 1000, // Signup bonus
+        balance: 1000,
         referralCode: newReferralCode,
         referredBy,
+        walletAddress: walletAddress || null,
         createdAt: new Date().toISOString(),
         isAdmin: email === 'admin@example.com'
     };
@@ -115,7 +115,8 @@ app.post('/api/register', async (req, res) => {
             username: newUser.username, 
             email: newUser.email, 
             balance: newUser.balance,
-            referralCode: newUser.referralCode
+            referralCode: newUser.referralCode,
+            walletAddress: newUser.walletAddress
         }
     });
 });
@@ -144,6 +145,7 @@ app.post('/api/login', async (req, res) => {
             email: user.email, 
             balance: user.balance,
             referralCode: user.referralCode,
+            walletAddress: user.walletAddress,
             isAdmin: user.isAdmin || false
         }
     });
@@ -177,6 +179,7 @@ app.get('/api/me', verifyToken, (req, res) => {
         email: user.email, 
         balance: user.balance,
         referralCode: user.referralCode,
+        walletAddress: user.walletAddress,
         isAdmin: user.isAdmin || false
     });
 });
@@ -204,7 +207,95 @@ app.get('/api/referral-stats', verifyToken, (req, res) => {
 });
 
 // ============================================================
-// DEPOSIT (Manual & TronGrid)
+// iSPORTS API PROXY - ALL ENDPOINTS
+// ============================================================
+
+// 1. Live Scores
+app.get('/api/livescores', async (req, res) => {
+    try {
+        const url = `http://api.isportsapi.com/sport/football/livescores?api_key=${API_KEY}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 2. Main Odds (1X2, Asian Handicap basics)
+app.get('/api/odds/main', async (req, res) => {
+    try {
+        const { matchId, companyId } = req.query;
+        let url = `http://api.isportsapi.com/sport/football/odds/main?api_key=${API_KEY}`;
+        
+        if (matchId) url += `&matchId=${matchId}`;
+        if (companyId) url += `&companyId=${companyId}`;
+        else url += `&companyId=31,8,23`; // SBOBET, Bet365, 188bet
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 3. All Odds (Asian Handicap, Over/Under, Correct Score)
+app.get('/api/odds/all', async (req, res) => {
+    try {
+        const { matchId, companyId } = req.query;
+        let url = `http://api.isportsapi.com/sport/football/odds/all?api_key=${API_KEY}`;
+        
+        if (matchId) url += `&matchId=${matchId}`;
+        if (companyId) url += `&companyId=${companyId}`;
+        else url += `&companyId=31,8,23`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 4. Live Odds Changes - Main (1 second polling)
+app.get('/api/odds/main/changes', async (req, res) => {
+    try {
+        const { matchId, companyId } = req.query;
+        let url = `http://api.isportsapi.com/sport/football/odds/main/changes?api_key=${API_KEY}`;
+        
+        if (matchId) url += `&matchId=${matchId}`;
+        if (companyId) url += `&companyId=${companyId}`;
+        else url += `&companyId=31,8,23`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 5. Live Odds Changes - All Markets (1 second polling)
+app.get('/api/odds/all/changes', async (req, res) => {
+    try {
+        const { matchId, companyId } = req.query;
+        let url = `http://api.isportsapi.com/sport/football/odds/all/changes?api_key=${API_KEY}`;
+        
+        if (matchId) url += `&matchId=${matchId}`;
+        if (companyId) url += `&companyId=${companyId}`;
+        else url += `&companyId=31,8,23`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// DEPOSIT & WITHDRAWAL
 // ============================================================
 
 app.post('/api/manual-deposit', (req, res) => {
@@ -221,7 +312,6 @@ app.post('/api/manual-deposit', (req, res) => {
     
     user.balance += amount;
     
-    // Give referral commission (10% of deposit)
     if (user.referredBy) {
         const referrer = users.find(u => u.id === user.referredBy);
         if (referrer) {
@@ -262,10 +352,10 @@ app.post('/api/manual-deposit', (req, res) => {
     res.json({ success: true, newBalance: user.balance });
 });
 
-// TronGrid webhook endpoint
+// TronGrid Webhook for auto deposit
 app.post('/api/tron-webhook', async (req, res) => {
     try {
-        const { transaction_id, from, to, amount, contract_ret } = req.body;
+        const { transaction_id, from, to, amount } = req.body;
         
         if (to.toLowerCase() !== YOUR_WALLET.toLowerCase()) {
             return res.status(200).json({ received: false, reason: 'Not my wallet' });
@@ -287,10 +377,29 @@ app.post('/api/tron-webhook', async (req, res) => {
         };
         deposits.push(pendingDeposit);
         
+        // Try to auto-assign by matching wallet address
+        const user = users.find(u => u.walletAddress === from);
+        if (user) {
+            pendingDeposit.userId = user.id;
+            pendingDeposit.status = 'completed';
+            user.balance += pendingDeposit.amount;
+            
+            transactions.push({
+                id: nextTxId++,
+                userId: user.id,
+                type: 'deposit',
+                amount: pendingDeposit.amount,
+                status: 'completed',
+                description: `Auto USDT Deposit - TXID: ${transaction_id}`,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
         console.log(`💰 New USDT Deposit: ${amount} USDT from ${from}`);
         console.log(`   TXID: ${transaction_id}`);
+        console.log(`   Auto-assigned: ${user ? 'YES to ' + user.username : 'NO (pending)'}`);
         
-        res.json({ received: true, pending: true });
+        res.json({ received: true, auto_assigned: !!user });
         
     } catch (error) {
         console.error('TronGrid webhook error:', error);
@@ -324,7 +433,6 @@ app.post('/api/assign-deposit', (req, res) => {
     deposit.status = 'completed';
     user.balance += deposit.amount;
     
-    // Give referral commission
     if (user.referredBy) {
         const referrer = users.find(u => u.id === user.referredBy);
         if (referrer) {
@@ -355,10 +463,6 @@ app.post('/api/assign-deposit', (req, res) => {
     res.json({ success: true, newBalance: user.balance });
 });
 
-// ============================================================
-// WITHDRAWAL (Auto via TronGrid)
-// ============================================================
-
 app.post('/api/withdraw-request', verifyToken, async (req, res) => {
     const { amount, walletAddress } = req.body;
     const user = users.find(u => u.id === req.userId);
@@ -375,8 +479,6 @@ app.post('/api/withdraw-request', verifyToken, async (req, res) => {
         return res.status(400).json({ error: 'Minimum withdrawal is 10 USDT' });
     }
     
-    // For auto-withdrawal via TronGrid (requires private key)
-    // This creates a pending withdrawal for admin approval (safety)
     const withdrawal = {
         id: nextWithdrawalId++,
         userId: user.id,
@@ -504,6 +606,7 @@ app.get('/api/admin/users', (req, res) => {
         username: u.username,
         email: u.email,
         balance: u.balance,
+        walletAddress: u.walletAddress,
         referralCode: u.referralCode,
         referredBy: u.referredBy,
         createdAt: u.createdAt
@@ -540,21 +643,6 @@ app.get('/api/admin/stats', (req, res) => {
 });
 
 // ============================================================
-// iSPORTS API PROXY
-// ============================================================
-
-app.get('/api/livescores', async (req, res) => {
-    try {
-        const url = `http://api.isportsapi.com/sport/football/livescores?api_key=${API_KEY}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ============================================================
 // START SERVER
 // ============================================================
 
@@ -562,5 +650,11 @@ app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
     console.log(`🔑 Admin secret: ${ADMIN_SECRET}`);
     console.log(`💰 USDT Wallet: ${YOUR_WALLET}`);
+    console.log(`📡 API Endpoints available:`);
+    console.log(`   - /api/livescores`);
+    console.log(`   - /api/odds/main`);
+    console.log(`   - /api/odds/all`);
+    console.log(`   - /api/odds/main/changes`);
+    console.log(`   - /api/odds/all/changes`);
     console.log(`📡 TronGrid webhook: https://your-app.onrender.com/api/tron-webhook`);
 });
