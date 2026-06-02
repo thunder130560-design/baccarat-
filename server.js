@@ -1,6 +1,5 @@
 const express = require('express');
 const fetch = require('node-fetch');
-const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
@@ -11,40 +10,30 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-t
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'ADMIN_SECRET_123';
 const API_KEY = "y6qNrfP7R0qJUh1x";
 
-// TronGrid Configuration
 const YOUR_WALLET = "TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg";
 
 app.use(express.json());
 app.use(cors());
 app.use(express.static('public'));
 
-// ============================================================
-// DEMO MATCHES (When API has no real matches)
-// ============================================================
 const DEMO_MATCHES = [
-    { fixture_id: 1001, league_name: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League", home_team: "Manchester City", away_team: "Arsenal", event_date: new Date(Date.now() + 3600000).toISOString(), status: "notstarted" },
-    { fixture_id: 1002, league_name: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League", home_team: "Liverpool", away_team: "Chelsea", event_date: new Date(Date.now() + 7200000).toISOString(), status: "notstarted" },
-    { fixture_id: 1003, league_name: "🇪🇸 La Liga", home_team: "Real Madrid", away_team: "Barcelona", event_date: new Date(Date.now() + 10800000).toISOString(), status: "notstarted" },
-    { fixture_id: 1004, league_name: "🇩🇪 Bundesliga", home_team: "Bayern Munich", away_team: "Borussia Dortmund", event_date: new Date(Date.now() + 14400000).toISOString(), status: "notstarted" },
-    { fixture_id: 1005, league_name: "🇮🇹 Serie A", home_team: "Inter Milan", away_team: "AC Milan", event_date: new Date(Date.now() + 18000000).toISOString(), status: "notstarted" },
-    { fixture_id: 1006, league_name: "🇫🇷 Ligue 1", home_team: "PSG", away_team: "Marseille", event_date: new Date(Date.now() + 21600000).toISOString(), status: "notstarted" },
-    { fixture_id: 1007, league_name: "🏆 Champions League", home_team: "Real Madrid", away_team: "Bayern Munich", event_date: new Date(Date.now() + 86400000).toISOString(), status: "notstarted" }
+    { fixture_id: 1001, league_name: "Premier League", home_team: "Manchester City", away_team: "Arsenal", event_date: new Date(Date.now() + 3600000).toISOString(), status: "notstarted" },
+    { fixture_id: 1002, league_name: "Premier League", home_team: "Liverpool", away_team: "Chelsea", event_date: new Date(Date.now() + 7200000).toISOString(), status: "notstarted" },
+    { fixture_id: 1003, league_name: "La Liga", home_team: "Real Madrid", away_team: "Barcelona", event_date: new Date(Date.now() + 10800000).toISOString(), status: "notstarted" },
+    { fixture_id: 1004, league_name: "Bundesliga", home_team: "Bayern Munich", away_team: "Borussia Dortmund", event_date: new Date(Date.now() + 14400000).toISOString(), status: "notstarted" },
+    { fixture_id: 1005, league_name: "Serie A", home_team: "Inter Milan", away_team: "AC Milan", event_date: new Date(Date.now() + 18000000).toISOString(), status: "notstarted" },
+    { fixture_id: 1006, league_name: "Ligue 1", home_team: "PSG", away_team: "Marseille", event_date: new Date(Date.now() + 21600000).toISOString(), status: "notstarted" }
 ];
 
-// Demo odds for matches
 const DEMO_ODDS = {
     1001: { odds_home: 1.85, odds_draw: 3.60, odds_away: 4.20 },
     1002: { odds_home: 1.90, odds_draw: 3.50, odds_away: 4.00 },
     1003: { odds_home: 2.20, odds_draw: 3.50, odds_away: 3.20 },
     1004: { odds_home: 1.75, odds_draw: 4.00, odds_away: 4.50 },
     1005: { odds_home: 2.30, odds_draw: 3.30, odds_away: 3.10 },
-    1006: { odds_home: 1.55, odds_draw: 4.20, odds_away: 6.00 },
-    1007: { odds_home: 2.10, odds_draw: 3.40, odds_away: 3.50 }
+    1006: { odds_home: 1.55, odds_draw: 4.20, odds_away: 6.00 }
 };
 
-// ============================================================
-// DATABASE (In-Memory)
-// ============================================================
 const users = [];
 const deposits = [];
 const withdrawals = [];
@@ -60,10 +49,6 @@ let nextTxId = 1;
 function generateReferralCode() {
     return 'REF_' + Math.random().toString(36).substring(2, 10).toUpperCase();
 }
-
-// ============================================================
-// USER REGISTRATION & LOGIN
-// ============================================================
 
 app.post('/api/register', async (req, res) => {
     const { username, email, password, confirmPassword, referralCode } = req.body;
@@ -196,10 +181,6 @@ app.get('/api/me', verifyToken, (req, res) => {
     });
 });
 
-// ============================================================
-// REFERRAL STATS
-// ============================================================
-
 app.get('/api/referral-stats', verifyToken, (req, res) => {
     const user = users.find(u => u.id === req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -218,11 +199,6 @@ app.get('/api/referral-stats', verifyToken, (req, res) => {
     });
 });
 
-// ============================================================
-// iSPORTS API PROXY (WITH DEMO FALLBACK)
-// ============================================================
-
-// 1. Get upcoming matches (with demo fallback)
 app.get('/api/upcoming-matches', async (req, res) => {
     try {
         const { date } = req.query;
@@ -232,7 +208,6 @@ app.get('/api/upcoming-matches', async (req, res) => {
         const response = await fetch(url);
         const data = await response.json();
         
-        // Filter only matches that haven't started
         let matches = [];
         if (data && data.data && data.data.length > 0) {
             matches = data.data.filter(match => 
@@ -240,19 +215,16 @@ app.get('/api/upcoming-matches', async (req, res) => {
             );
         }
         
-        // If API returns no matches, use demo data
         if (!matches || matches.length === 0) {
             return res.json(DEMO_MATCHES);
         }
         
         res.json(matches);
     } catch (error) {
-        // If API fails, return demo data
         res.json(DEMO_MATCHES);
     }
 });
 
-// 2. Get ALL odds for a match (with demo fallback)
 app.get('/api/match-odds/:matchId', async (req, res) => {
     try {
         const { matchId } = req.params;
@@ -263,28 +235,21 @@ app.get('/api/match-odds/:matchId', async (req, res) => {
         const response = await fetch(url);
         const data = await response.json();
         
-        // If API fails or returns empty, use demo odds
         if (!data || !data.data || data.data.length === 0) {
             if (DEMO_ODDS[matchId]) {
                 return res.json({ data: [{ ...DEMO_ODDS[matchId], matchId }] });
             }
-            // Default odds
             return res.json({ data: [{ odds_home: 2.00, odds_draw: 3.20, odds_away: 3.50, matchId }] });
         }
         
         res.json(data);
     } catch (error) {
-        // Return demo odds on error
         if (DEMO_ODDS[matchId]) {
             return res.json({ data: [{ ...DEMO_ODDS[matchId], matchId }] });
         }
         res.json({ data: [{ odds_home: 2.00, odds_draw: 3.20, odds_away: 3.50, matchId: parseInt(matchId) }] });
     }
 });
-
-// ============================================================
-// DEPOSIT & WITHDRAWAL
-// ============================================================
 
 app.post('/api/manual-deposit', (req, res) => {
     const { userId, amount, txid, adminKey } = req.body;
@@ -300,7 +265,6 @@ app.post('/api/manual-deposit', (req, res) => {
     
     user.balance += amount;
     
-    // Give referral commission (10% of deposit)
     if (user.referredBy) {
         const referrer = users.find(u => u.id === user.referredBy);
         if (referrer) {
@@ -367,7 +331,6 @@ app.post('/api/tron-webhook', async (req, res) => {
         };
         deposits.push(pendingDeposit);
         
-        // Try to auto-assign by matching wallet address
         const user = users.find(u => u.walletAddress === from);
         if (user && depositAmount > 0) {
             pendingDeposit.userId = user.id;
@@ -529,10 +492,6 @@ app.post('/api/approve-withdrawal', (req, res) => {
     res.json({ success: true });
 });
 
-// ============================================================
-// BETS
-// ============================================================
-
 app.post('/api/place-bet', verifyToken, (req, res) => {
     const { bets: betSelections, totalStake, totalOdds } = req.body;
     const user = users.find(u => u.id === req.userId);
@@ -582,10 +541,6 @@ app.get('/api/user-transactions', verifyToken, (req, res) => {
     res.json(userTransactions);
 });
 
-// ============================================================
-// ADMIN PANEL DATA
-// ============================================================
-
 app.get('/api/admin/users', (req, res) => {
     const usersData = users.map(u => ({
         id: u.id,
@@ -626,23 +581,8 @@ app.get('/api/admin/stats', (req, res) => {
     });
 });
 
-// ============================================================
-// START SERVER
-// ============================================================
-
 app.listen(PORT, () => {
-    console.log(`
-╔══════════════════════════════════════════════════════════════╗
-║     ✅ 5D SOCCER BET SERVER RUNNING                         ║
-╠══════════════════════════════════════════════════════════════╣
-║                                                              ║
-║   📡 Endpoints available:                                   ║
-║   - GET  /api/upcoming-matches   (upcoming fixtures)        ║
-║   - GET  /api/match-odds/:id     (all odds)                 ║
-║                                                              ║
-║   💰 USDT Wallet: ${YOUR_WALLET}                              ║
-║   🎯 Demo matches loaded (7 matches)                        ║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝
-    `);
+    console.log(`Server running on port ${PORT}`);
+    console.log(`USDT Wallet: ${YOUR_WALLET}`);
+    console.log(`Demo matches loaded: ${DEMO_MATCHES.length} matches`);
 });
