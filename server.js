@@ -170,10 +170,9 @@ app.get('/api/me', verifyToken, (req, res) => {
 });
 
 // ============================================================
-// iSPORTS API - LIVE SCORES (WORKING ENDPOINT)
+// iSPORTS API - LIVE SCORES (matches with scores)
 // ============================================================
 
-// Get live scores from your API
 app.get('/api/live-scores', async (req, res) => {
     try {
         const url = `http://api.isportsapi.com/sport/football/livescores?api_key=${API_KEY}`;
@@ -189,11 +188,39 @@ app.get('/api/live-scores', async (req, res) => {
         }
     } catch (error) {
         console.error("Error fetching live scores:", error);
-        res.status(500).json({ error: error.message });
+        res.json([]);
     }
 });
 
-// Get odds for a match
+// ============================================================
+// iSPORTS API - UPCOMING MATCHES (no scores, haven't started)
+// ============================================================
+
+app.get('/api/upcoming-matches', async (req, res) => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const url = `http://api.isportsapi.com/sport/football/fixtures?api_key=${API_KEY}&date=${today}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        console.log("Upcoming matches fetched:", data.data ? data.data.length : 0, "fixtures");
+        
+        if (data && data.data) {
+            const upcoming = data.data.filter(m => m.status === 'notstarted' || m.status === 'scheduled');
+            res.json(upcoming);
+        } else {
+            res.json([]);
+        }
+    } catch (error) {
+        console.error("Error fetching upcoming matches:", error);
+        res.json([]);
+    }
+});
+
+// ============================================================
+// iSPORTS API - ODDS FOR A MATCH
+// ============================================================
+
 app.get('/api/match-odds/:matchId', async (req, res) => {
     try {
         const { matchId } = req.params;
@@ -551,8 +578,9 @@ app.listen(PORT, () => {
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║   📡 Endpoints:                                             ║
-║   - GET /api/live-scores  (live matches)                    ║
-║   - GET /api/match-odds/:id (odds)                          ║
+║   - GET /api/live-scores     (live matches with scores)     ║
+║   - GET /api/upcoming-matches (upcoming matches, no scores) ║
+║   - GET /api/match-odds/:id   (odds for a match)            ║
 ║                                                              ║
 ║   💰 USDT Wallet: ${YOUR_WALLET}                              ║
 ║                                                              ║
