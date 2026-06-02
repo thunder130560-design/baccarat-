@@ -6,8 +6,10 @@ const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'ADMIN_SECRET_123';
+
+// YOUR API KEY - REPLACE WITH YOUR REAL KEY
 const API_KEY = "y6qNrfP7R0qJUh1x";
 
 const YOUR_WALLET = "TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg";
@@ -16,24 +18,9 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static('public'));
 
-const DEMO_MATCHES = [
-    { fixture_id: 1001, league_name: "Premier League", home_team: "Manchester City", away_team: "Arsenal", event_date: new Date(Date.now() + 3600000).toISOString(), status: "notstarted" },
-    { fixture_id: 1002, league_name: "Premier League", home_team: "Liverpool", away_team: "Chelsea", event_date: new Date(Date.now() + 7200000).toISOString(), status: "notstarted" },
-    { fixture_id: 1003, league_name: "La Liga", home_team: "Real Madrid", away_team: "Barcelona", event_date: new Date(Date.now() + 10800000).toISOString(), status: "notstarted" },
-    { fixture_id: 1004, league_name: "Bundesliga", home_team: "Bayern Munich", away_team: "Borussia Dortmund", event_date: new Date(Date.now() + 14400000).toISOString(), status: "notstarted" },
-    { fixture_id: 1005, league_name: "Serie A", home_team: "Inter Milan", away_team: "AC Milan", event_date: new Date(Date.now() + 18000000).toISOString(), status: "notstarted" },
-    { fixture_id: 1006, league_name: "Ligue 1", home_team: "PSG", away_team: "Marseille", event_date: new Date(Date.now() + 21600000).toISOString(), status: "notstarted" }
-];
-
-const DEMO_ODDS = {
-    1001: { odds_home: 1.85, odds_draw: 3.60, odds_away: 4.20 },
-    1002: { odds_home: 1.90, odds_draw: 3.50, odds_away: 4.00 },
-    1003: { odds_home: 2.20, odds_draw: 3.50, odds_away: 3.20 },
-    1004: { odds_home: 1.75, odds_draw: 4.00, odds_away: 4.50 },
-    1005: { odds_home: 2.30, odds_draw: 3.30, odds_away: 3.10 },
-    1006: { odds_home: 1.55, odds_draw: 4.20, odds_away: 6.00 }
-};
-
+// ============================================================
+// DATABASE
+// ============================================================
 const users = [];
 const deposits = [];
 const withdrawals = [];
@@ -49,6 +36,10 @@ let nextTxId = 1;
 function generateReferralCode() {
     return 'REF_' + Math.random().toString(36).substring(2, 10).toUpperCase();
 }
+
+// ============================================================
+// USER REGISTRATION & LOGIN
+// ============================================================
 
 app.post('/api/register', async (req, res) => {
     const { username, email, password, confirmPassword, referralCode } = req.body;
@@ -181,33 +172,33 @@ app.get('/api/me', verifyToken, (req, res) => {
     });
 });
 
-app.get('/api/referral-stats', verifyToken, (req, res) => {
-    const user = users.find(u => u.id === req.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    
-    const referredUsers = users.filter(u => u.referredBy === user.id);
-    const totalReferrals = referredUsers.length;
-    const totalCommission = transactions
-        .filter(t => t.userId === user.id && t.type === 'referral_commission')
-        .reduce((sum, t) => sum + t.amount, 0);
-    
-    res.json({
-        referralCode: user.referralCode,
-        totalReferrals,
-        totalCommission,
-        referralLink: `https://go-f55z.onrender.com/?ref=${user.referralCode}`
-    });
-});
+// ============================================================
+// iSPORTS API - REAL ENDPOINTS
+// ============================================================
 
+// Get upcoming fixtures (matches that haven't started)
 app.get('/api/upcoming-matches', async (req, res) => {
     try {
         const { date } = req.query;
         const targetDate = date || new Date().toISOString().split('T')[0];
+        
+        // CORRECT ENDPOINT from your Java code example
         const url = `http://api.isportsapi.com/sport/football/fixtures?api_key=${API_KEY}&date=${targetDate}`;
+        
+        console.log("Fetching fixtures from:", url);
         
         const response = await fetch(url);
         const data = await response.json();
         
+        console.log("API Response:", data);
+        
+        // Check if API returned an error
+        if (data.code && data.code !== 0) {
+            console.log("API Error:", data.message);
+            return res.json([]);
+        }
+        
+        // Filter only matches that haven't started
         let matches = [];
         if (data && data.data && data.data.length > 0) {
             matches = data.data.filter(match => 
@@ -215,41 +206,63 @@ app.get('/api/upcoming-matches', async (req, res) => {
             );
         }
         
-        if (!matches || matches.length === 0) {
-            return res.json(DEMO_MATCHES);
-        }
-        
         res.json(matches);
+        
     } catch (error) {
-        res.json(DEMO_MATCHES);
+        console.error("Error fetching fixtures:", error);
+        res.json([]);
     }
 });
 
+// Get odds for a specific match (including Handicap & Over/Under)
 app.get('/api/match-odds/:matchId', async (req, res) => {
     try {
         const { matchId } = req.params;
         const { companyId } = req.query;
         const companies = companyId || '31,8,23';
         
+        // CORRECT ENDPOINT from your Java code example
         const url = `http://api.isportsapi.com/sport/football/odds/all?api_key=${API_KEY}&matchId=${matchId}&companyId=${companies}`;
+        
+        console.log("Fetching odds for match:", matchId);
+        
         const response = await fetch(url);
         const data = await response.json();
         
-        if (!data || !data.data || data.data.length === 0) {
-            if (DEMO_ODDS[matchId]) {
-                return res.json({ data: [{ ...DEMO_ODDS[matchId], matchId }] });
-            }
-            return res.json({ data: [{ odds_home: 2.00, odds_draw: 3.20, odds_away: 3.50, matchId }] });
+        if (data.code && data.code !== 0) {
+            console.log("API Error for odds:", data.message);
+            return res.json({ data: [] });
         }
         
         res.json(data);
+        
     } catch (error) {
-        if (DEMO_ODDS[matchId]) {
-            return res.json({ data: [{ ...DEMO_ODDS[matchId], matchId }] });
-        }
-        res.json({ data: [{ odds_home: 2.00, odds_draw: 3.20, odds_away: 3.50, matchId: parseInt(matchId) }] });
+        console.error("Error fetching odds:", error);
+        res.json({ data: [] });
     }
 });
+
+// Get live odds changes (for real-time updates)
+app.get('/api/odds-changes', async (req, res) => {
+    try {
+        const { matchId, companyId } = req.query;
+        let url = `http://api.isportsapi.com/sport/football/odds/all/changes?api_key=${API_KEY}`;
+        
+        if (matchId) url += `&matchId=${matchId}`;
+        if (companyId) url += `&companyId=${companyId}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        res.json(data);
+        
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// DEPOSIT & WITHDRAWAL (same as before)
+// ============================================================
 
 app.post('/api/manual-deposit', (req, res) => {
     const { userId, amount, txid, adminKey } = req.body;
@@ -582,7 +595,18 @@ app.get('/api/admin/stats', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`USDT Wallet: ${YOUR_WALLET}`);
-    console.log(`Demo matches loaded: ${DEMO_MATCHES.length} matches`);
+    console.log(`
+╔══════════════════════════════════════════════════════════════╗
+║     ✅ SOCCER BET SERVER RUNNING (NO FAKE MATCHES)          ║
+╠══════════════════════════════════════════════════════════════╣
+║                                                              ║
+║   📡 API Endpoints:                                         ║
+║   - GET /api/upcoming-matches                               ║
+║   - GET /api/match-odds/:matchId                            ║
+║   - GET /api/odds-changes                                   ║
+║                                                              ║
+║   💰 USDT Wallet: ${YOUR_WALLET}                              ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+    `);
 });
