@@ -382,4 +382,400 @@
     </div>
 
     <div id="betPopup" class="bet-popup">
-        <div class
+        <div class="bet-popup-content">
+            <h3 id="popupMatchName" style="color:#FFD700;">Match</h3>
+            <div class="bet-popup-odds" id="popupOdds">2.00x</div>
+            <div id="popupSelection" style="color:white; margin-bottom:10px;"></div>
+            <input type="number" id="popupStake" class="bet-popup-stake" placeholder="Amount (USDT)" value="10" step="5" min="5">
+            <div id="popupPotential" style="color:#00FF88; font-size:0.8rem;"></div>
+            <button id="confirmBetBtn" class="bet-popup-btn">Confirm Bet</button>
+            <button id="closePopupBtn" class="bet-popup-close">Cancel</button>
+        </div>
+    </div>
+
+    <div id="authModal" class="auth-modal">
+        <div class="auth-modal-content">
+            <h2 id="authTitle" style="color:#FFD700; text-align:center;">Login</h2>
+            <div id="loginFields">
+                <input type="email" id="loginEmail" class="auth-input" placeholder="Email">
+                <input type="password" id="loginPassword" class="auth-input" placeholder="Password">
+                <button id="doLoginBtn" class="auth-btn-full">Login</button>
+            </div>
+            <div id="signupFields" style="display:none;">
+                <input type="text" id="signupUsername" class="auth-input" placeholder="Username">
+                <input type="email" id="signupEmail" class="auth-input" placeholder="Email">
+                <input type="password" id="signupPassword" class="auth-input" placeholder="Password">
+                <input type="password" id="signupConfirmPassword" class="auth-input" placeholder="Confirm Password">
+                <input type="text" id="signupReferral" class="auth-input" placeholder="Referral Code (optional)">
+                <button id="doSignupBtn" class="auth-btn-full">Sign Up</button>
+            </div>
+            <button id="switchAuthModeBtn" class="auth-btn-full" style="background:transparent; color:#FFD700; border:1px solid #FFD700;">Don't have account? Sign up</button>
+            <button id="closeAuthModalBtn" class="auth-btn-full" style="background:#2a2a2a;">Close</button>
+        </div>
+    </div>
+
+    <!-- Deposit Modal with QR Code -->
+    <div id="depositModal" class="auth-modal">
+        <div class="auth-modal-content" style="text-align:center;">
+            <h2 style="color:#FFD700;">Deposit USDT</h2>
+            <div id="qrCode" style="display:flex; justify-content:center; margin:15px 0;"></div>
+            <div style="background:#0a0a10; padding:10px; border-radius:16px; font-family:monospace; font-size:0.7rem; word-break:break-all;">TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg</div>
+            <button id="copyDepositAddrBtn" class="auth-btn-full" style="margin-top:10px;">Copy Address</button>
+            <button id="closeDepositModalBtn" class="auth-btn-full" style="background:#2a2a2a;">Close</button>
+        </div>
+    </div>
+
+    <!-- Withdraw Modal -->
+    <div id="withdrawModal" class="auth-modal">
+        <div class="auth-modal-content">
+            <h2 style="color:#FFD700;">Withdraw USDT</h2>
+            <input type="text" id="withdrawAddress" class="auth-input" placeholder="TRC-20 Wallet Address">
+            <input type="number" id="withdrawAmount" class="auth-input" placeholder="Amount (USDT)" min="10" step="10">
+            <button id="submitWithdrawBtn" class="auth-btn-full">Request Withdrawal</button>
+            <div id="withdrawMsg" style="color:#FF6666; font-size:0.7rem; margin-top:8px;"></div>
+            <button id="closeWithdrawModalBtn" class="auth-btn-full" style="background:#2a2a2a;">Close</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+// ============================================================
+// COMPLETE FRONTEND - WITH SESSION PERSISTENCE, QR, HISTORY
+// ============================================================
+
+let token = localStorage.getItem('authToken');
+let currentUserId = null, currentUserBalance = 0, currentUsername = "";
+let bettingSlip = [], realMatches = [], userBets = [];
+let currentTab = "live";
+let pendingBet = null;
+let slipOpen = false;
+
+// DOM
+const balanceDisplay = document.getElementById('balanceDisplay');
+const usernameDisplay = document.getElementById('usernameDisplay');
+const matchesContainer = document.getElementById('matchesContainer');
+const apiStatusDiv = document.getElementById('apiStatus');
+const slipItemsDiv = document.getElementById('slipItems');
+const totalDisplayDiv = document.getElementById('totalDisplay');
+const authSection = document.getElementById('authSection');
+const userSection = document.getElementById('userSection');
+const floatingSlip = document.getElementById('floatingSlip');
+const toggleSlipBtn = document.getElementById('toggleSlipBtn');
+const historyContainer = document.getElementById('historyContainer');
+const historyItemsDiv = document.getElementById('historyItems');
+
+// ============================================================
+// AUTH & SESSION
+// ============================================================
+async function checkSession() {
+    if (!token) return false;
+    try {
+        const res = await fetch('/api/me', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) {
+            const user = await res.json();
+            currentUserId = user.id;
+            currentUserBalance = user.balance;
+            currentUsername = user.username;
+            updateBalanceUI();
+            usernameDisplay.innerText = currentUsername;
+            authSection.style.display = 'none';
+            userSection.style.display = 'block';
+            fetchLiveMatches();
+            fetchUserBets();
+            return true;
+        } else {
+            localStorage.removeItem('authToken');
+            token = null;
+            return false;
+        }
+    } catch(e) { return false; }
+}
+
+async function login(email, password) {
+    try {
+        const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+        const data = await res.json();
+        if (data.success) {
+            token = data.token;
+            localStorage.setItem('authToken', token);
+            currentUserId = data.user.id;
+            currentUserBalance = data.user.balance;
+            currentUsername = data.user.username;
+            updateBalanceUI();
+            usernameDisplay.innerText = currentUsername;
+            authSection.style.display = 'none';
+            userSection.style.display = 'block';
+            closeAuthModal();
+            fetchLiveMatches();
+            fetchUserBets();
+            return true;
+        } else { alert(data.error); return false; }
+    } catch(e) { alert("Login error"); return false; }
+}
+
+async function signup(username, email, password, confirm, referral) {
+    if (password !== confirm) { alert("Passwords do not match"); return false; }
+    if (password.length < 6) { alert("Password must be at least 6 characters"); return false; }
+    try {
+        const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, password, confirmPassword: confirm, referralCode: referral }) });
+        const data = await res.json();
+        if (data.success) {
+            alert('Account created! Please login.');
+            switchToLogin();
+            return true;
+        } else { alert(data.error); return false; }
+    } catch(e) { alert("Signup error"); return false; }
+}
+
+function logout() {
+    localStorage.removeItem('authToken');
+    token = null;
+    currentUserId = null;
+    currentUserBalance = 0;
+    currentUsername = "";
+    bettingSlip = [];
+    userBets = [];
+    authSection.style.display = 'block';
+    userSection.style.display = 'none';
+    historyContainer.style.display = 'none';
+    renderSlip();
+    matchesContainer.innerHTML = '<div class="loading">🔐 Please login</div>';
+}
+
+function updateBalanceUI() { balanceDisplay.innerText = currentUserBalance.toLocaleString(); }
+
+// ============================================================
+// MODALS
+// ============================================================
+let isLoginMode = true;
+const authModal = document.getElementById('authModal');
+const depositModal = document.getElementById('depositModal');
+const withdrawModal = document.getElementById('withdrawModal');
+
+function openAuthModal() { authModal.style.display = 'flex'; }
+function closeAuthModal() { authModal.style.display = 'none'; }
+function switchToLogin() {
+    isLoginMode = true;
+    document.getElementById('authTitle').innerText = 'Login';
+    document.getElementById('loginFields').style.display = 'block';
+    document.getElementById('signupFields').style.display = 'none';
+    document.getElementById('switchAuthModeBtn').innerText = "Don't have account? Sign up";
+}
+function switchToSignup() {
+    isLoginMode = false;
+    document.getElementById('authTitle').innerText = 'Sign Up';
+    document.getElementById('loginFields').style.display = 'none';
+    document.getElementById('signupFields').style.display = 'block';
+    document.getElementById('switchAuthModeBtn').innerText = 'Already have account? Login';
+}
+
+document.getElementById('showLoginBtn')?.addEventListener('click', () => { switchToLogin(); openAuthModal(); });
+document.getElementById('showSignupBtn')?.addEventListener('click', () => { switchToSignup(); openAuthModal(); });
+document.getElementById('switchAuthModeBtn')?.addEventListener('click', () => { if (isLoginMode) switchToSignup(); else switchToLogin(); });
+document.getElementById('doLoginBtn')?.addEventListener('click', () => { const email = document.getElementById('loginEmail').value; const pwd = document.getElementById('loginPassword').value; login(email, pwd); });
+document.getElementById('doSignupBtn')?.addEventListener('click', () => {
+    const u = document.getElementById('signupUsername').value;
+    const e = document.getElementById('signupEmail').value;
+    const p = document.getElementById('signupPassword').value;
+    const c = document.getElementById('signupConfirmPassword').value;
+    const r = document.getElementById('signupReferral').value;
+    signup(u, e, p, c, r);
+});
+document.getElementById('closeAuthModalBtn')?.addEventListener('click', closeAuthModal);
+
+// Deposit with QR
+document.getElementById('depositBtn')?.addEventListener('click', () => {
+    depositModal.style.display = 'flex';
+    setTimeout(() => {
+        if (typeof QRCode !== 'undefined') {
+            document.getElementById('qrCode').innerHTML = '';
+            new QRCode(document.getElementById('qrCode'), { text: 'TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg', width: 180, height: 180 });
+        }
+    }, 100);
+});
+document.getElementById('closeDepositModalBtn')?.addEventListener('click', () => depositModal.style.display = 'none');
+document.getElementById('copyDepositAddrBtn')?.addEventListener('click', () => { navigator.clipboard.writeText('TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg'); alert('Address copied!'); });
+
+// Withdraw
+document.getElementById('withdrawBtn')?.addEventListener('click', () => withdrawModal.style.display = 'flex');
+document.getElementById('closeWithdrawModalBtn')?.addEventListener('click', () => withdrawModal.style.display = 'none');
+document.getElementById('submitWithdrawBtn')?.addEventListener('click', async () => {
+    const addr = document.getElementById('withdrawAddress').value.trim();
+    const amount = parseFloat(document.getElementById('withdrawAmount').value);
+    if (!addr) { document.getElementById('withdrawMsg').innerText = 'Enter address'; return; }
+    if (isNaN(amount) || amount < 10) { document.getElementById('withdrawMsg').innerText = 'Minimum 10 USDT'; return; }
+    if (amount > currentUserBalance) { document.getElementById('withdrawMsg').innerText = 'Insufficient balance'; return; }
+    const res = await fetch('/api/withdraw-request', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ amount, walletAddress: addr }) });
+    const data = await res.json();
+    if (data.success) { alert('Withdrawal request submitted!'); withdrawModal.style.display = 'none'; document.getElementById('withdrawAddress').value = ''; document.getElementById('withdrawAmount').value = ''; }
+    else { alert(data.error); }
+});
+
+// History button
+document.getElementById('historyBtn')?.addEventListener('click', () => {
+    if (historyContainer.style.display === 'none') { historyContainer.style.display = 'block'; fetchUserBets(); }
+    else { historyContainer.style.display = 'none'; }
+});
+
+document.getElementById('logoutBtn')?.addEventListener('click', logout);
+toggleSlipBtn?.addEventListener('click', () => { slipOpen = !slipOpen; if(slipOpen) floatingSlip.classList.add('open'); else floatingSlip.classList.remove('open'); });
+
+// ============================================================
+// FETCH MATCHES
+// ============================================================
+async function fetchLiveMatches() {
+    if (!currentUserId) return;
+    apiStatusDiv.innerHTML = "🔄 Fetching...";
+    try {
+        const res = await fetch('/api/livescores');
+        const data = await res.json();
+        if (!data || !data.data || data.data.length === 0) {
+            apiStatusDiv.innerHTML = "⚠️ No live matches";
+            matchesContainer.innerHTML = '<div class="loading">⚽ No matches</div>';
+            return;
+        }
+        realMatches = data.data.map(m => ({
+            id: m.matchId, league: m.leagueName || "Football",
+            home: m.homeTeamName || m.homeTeam || "Home", away: m.awayTeamName || m.awayTeam || "Away",
+            homeScore: m.homeScore || 0, awayScore: m.awayScore || 0,
+            odds: { home: 2.00, draw: 3.20, away: 3.50 }
+        }));
+        apiStatusDiv.innerHTML = `✅ ${realMatches.length} matches`;
+        renderMatchesByTab();
+    } catch(e) { apiStatusDiv.innerHTML = "❌ Error"; }
+}
+
+function renderMatchesByTab() {
+    let filtered = realMatches;
+    if(currentTab === 'live') filtered = realMatches;
+    else if(currentTab === 'early') filtered = realMatches.slice(0, 5);
+    const leagues = {};
+    filtered.forEach(m => { if(!leagues[m.league]) leagues[m.league] = []; leagues[m.league].push(m); });
+    matchesContainer.innerHTML = Object.keys(leagues).map(leagueName => `
+        <div class="league-group">
+            <div class="league-header" data-league="${leagueName.replace(/ /g, '_')}">
+                <span class="league-name">🏆 ${leagueName}</span>
+                <span class="league-count">${leagues[leagueName].length} matches</span>
+            </div>
+            <div class="league-matches collapsed" id="league_${leagueName.replace(/ /g, '_')}">
+                ${leagues[leagueName].map(m => `
+                    <div class="match-card">
+                        <div class="match-header"><span>🔴 ${currentTab === 'live' ? 'LIVE' : (currentTab === 'early' ? 'EARLY' : 'TODAY')}</span><span>${m.homeScore} - ${m.awayScore}</span></div>
+                        <div class="match-teams">
+                            <div class="match-team"><div class="match-team-name">${escapeHtml(m.home)}</div><div class="match-score">${m.homeScore}</div><button class="bet-team-btn" data-home="${escapeHtml(m.home)}" data-away="${escapeHtml(m.away)}" data-team="${escapeHtml(m.home)}" data-odds="${m.odds.home}">HOME ${m.odds.home.toFixed(2)}</button></div>
+                            <div class="match-vs">VS</div>
+                            <div class="match-team"><div class="match-team-name">${escapeHtml(m.away)}</div><div class="match-score">${m.awayScore}</div><button class="bet-team-btn" data-home="${escapeHtml(m.home)}" data-away="${escapeHtml(m.away)}" data-team="${escapeHtml(m.away)}" data-odds="${m.odds.away}">AWAY ${m.odds.away.toFixed(2)}</button></div>
+                        </div>
+                        <div class="bet-row"><button class="bet-team-btn" data-home="${escapeHtml(m.home)}" data-away="${escapeHtml(m.away)}" data-team="Draw" data-odds="${m.odds.draw}">DRAW ${m.odds.draw.toFixed(2)}</button></div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+    document.querySelectorAll('.league-header').forEach(h => { h.addEventListener('click', () => { const id = h.dataset.league; const div = document.getElementById(`league_${id}`); if(div) div.classList.toggle('collapsed'); }); });
+    document.querySelectorAll('.bet-team-btn').forEach(btn => { btn.addEventListener('click', (e) => { e.stopPropagation(); showBetPopup(btn); }); });
+}
+
+function showBetPopup(btn) {
+    const home = btn.dataset.home, away = btn.dataset.away, team = btn.dataset.team, odds = parseFloat(btn.dataset.odds);
+    pendingBet = { matchName: `${home} vs ${away}`, team, odds };
+    document.getElementById('popupMatchName').innerHTML = `${home} vs ${away}`;
+    document.getElementById('popupOdds').innerHTML = `${odds.toFixed(2)}x`;
+    document.getElementById('popupSelection').innerHTML = `Selecting: ${team}`;
+    const stake = 10;
+    document.getElementById('popupStake').value = stake;
+    document.getElementById('popupPotential').innerHTML = `Win: ${(stake * odds).toFixed(2)} USDT`;
+    document.getElementById('betPopup').style.display = 'flex';
+    document.getElementById('popupStake').oninput = () => { let s = parseFloat(document.getElementById('popupStake').value) || 10; document.getElementById('popupPotential').innerHTML = `Win: ${(s * odds).toFixed(2)} USDT`; };
+}
+
+document.getElementById('confirmBetBtn')?.addEventListener('click', () => {
+    if(!pendingBet) return;
+    const stake = parseFloat(document.getElementById('popupStake').value) || 10;
+    if(stake < 5) { alert("Minimum 5 USDT"); return; }
+    addToSlip({ matchName: pendingBet.matchName, team: pendingBet.team, odds: pendingBet.odds, stake });
+    document.getElementById('betPopup').style.display = 'none';
+    if(!slipOpen) { slipOpen = true; floatingSlip.classList.add('open'); }
+});
+document.getElementById('closePopupBtn')?.addEventListener('click', () => { document.getElementById('betPopup').style.display = 'none'; });
+
+// ============================================================
+// BET SLIP
+// ============================================================
+function addToSlip(bet) {
+    const existing = bettingSlip.findIndex(b => b.matchName === bet.matchName && b.team === bet.team);
+    if(existing !== -1) bettingSlip[existing].stake += bet.stake;
+    else bettingSlip.push({ id: Date.now(), matchName: bet.matchName, team: bet.team, odds: bet.odds, stake: bet.stake });
+    renderSlip();
+}
+
+function renderSlip() {
+    if(bettingSlip.length === 0) {
+        slipItemsDiv.innerHTML = '<div style="text-align:center; padding:20px;">Tap odds</div>';
+        totalDisplayDiv.style.display = 'none';
+        return;
+    }
+    let totalStake = 0, totalOdds = 1;
+    slipItemsDiv.innerHTML = bettingSlip.map((b, idx) => { totalStake += b.stake; totalOdds *= b.odds; return `
+        <div class="slip-item"><div class="slip-match">${escapeHtml(b.matchName)}</div><div class="slip-selection">${escapeHtml(b.team)} @ ${b.odds.toFixed(2)}</div><div class="slip-stake-row"><input type="number" value="${b.stake}" class="stake-input" data-idx="${idx}" step="5" min="5"><button class="remove-btn" data-idx="${idx}">✖</button></div></div>
+    `; }).join('');
+    totalDisplayDiv.style.display = 'block';
+    totalDisplayDiv.innerHTML = `💰 Total: ${totalStake.toFixed(2)} USDT | Parlay: ${totalOdds.toFixed(2)}x | Win: ${(totalStake*totalOdds).toFixed(2)} USDT`;
+    document.querySelectorAll('.stake-input').forEach(inp => inp.addEventListener('change', (e) => { let idx = parseInt(inp.dataset.idx); let ns = parseFloat(inp.value); if(isNaN(ns)||ns<5) ns=5; bettingSlip[idx].stake = ns; renderSlip(); }));
+    document.querySelectorAll('.remove-btn').forEach(btn => btn.addEventListener('click', (e) => { let idx = parseInt(btn.dataset.idx); bettingSlip.splice(idx,1); renderSlip(); }));
+}
+
+async function placeBets() {
+    if(!currentUserId) { alert("Login first"); return; }
+    if(bettingSlip.length===0) { alert("No bets"); return; }
+    let totalStake = bettingSlip.reduce((s,b)=>s+b.stake,0);
+    if(totalStake > currentUserBalance) { alert(`Need ${totalStake} USDT`); return; }
+    let totalOdds = bettingSlip.reduce((p,b)=>p*b.odds,1);
+    try {
+        const res = await fetch('/api/place-bet', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ bets: bettingSlip.map(b=>({matchName:b.matchName, selection:b.team, odds:b.odds})), totalStake, totalOdds }) });
+        const data = await res.json();
+        if(data.success) { currentUserBalance = data.newBalance; updateBalanceUI(); alert(`✅ Bets placed! Stake: ${totalStake.toFixed(2)} USDT`); bettingSlip = []; renderSlip(); fetchUserBets(); }
+        else alert(data.error);
+    } catch(e) { alert("Error"); }
+}
+
+async function fetchUserBets() {
+    if(!currentUserId || !token) return;
+    try {
+        const res = await fetch('/api/user-bets', { headers: { 'Authorization': `Bearer ${token}` } });
+        const bets = await res.json();
+        userBets = bets;
+        if(historyContainer.style.display !== 'none') renderHistory();
+    } catch(e) {}
+}
+
+function renderHistory() {
+    if(!userBets.length) { historyItemsDiv.innerHTML = '<div style="text-align:center; padding:20px;">No bets yet</div>'; return; }
+    historyItemsDiv.innerHTML = userBets.slice().reverse().map(b => `
+        <div class="history-item">
+            <div style="color:#FFD700;">${new Date(b.timestamp).toLocaleString()}</div>
+            <div>Stake: ${b.totalStake.toFixed(2)} USDT | Odds: ${b.totalOdds.toFixed(2)}x | Potential: ${b.potentialWin.toFixed(2)} USDT</div>
+            <div class="history-status-${b.status || 'pending'}">Status: ${b.status || 'Pending'}</div>
+            <div style="font-size:0.65rem; color:#aaa;">${b.selections?.map(s => `${s.selection}`).join(' | ')}</div>
+        </div>
+    `).join('');
+}
+
+document.getElementById('clearSlipBtn')?.addEventListener('click', () => { bettingSlip = []; renderSlip(); });
+document.getElementById('placeBetBtn')?.addEventListener('click', placeBets);
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+        tab.classList.add('active');
+        currentTab = tab.dataset.tab;
+        renderMatchesByTab();
+    });
+});
+
+function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m=> m==='&'?'&amp;':(m==='<'?'&lt;':'&gt;')); }
+
+checkSession();
+</script>
+</body>
+</html>
