@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>⚡ SOCCER BET | Live Odds | Asian Handicap | Over/Under</title>
+    <title>⚡ LIVE SOCCER BET | Real API Matches</title>
     <style>
         * {
             margin: 0;
@@ -126,6 +126,16 @@
             color: #FFD700;
             font-size: 0.7rem;
         }
+        .match-status {
+            background: #ff4444;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.6rem;
+            color: white;
+        }
+        .match-status.finished { background: #555; }
+        .match-status.live { background: #ff4444; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
         .match-teams {
             display: flex;
@@ -139,6 +149,7 @@
             text-align: center;
         }
         .match-team-name { font-weight: bold; color: #FFFFFF; font-size: 0.85rem; }
+        .match-score { font-size: 1.2rem; font-weight: bold; color: #00FF88; margin-top: 4px; }
         .match-vs { color: #FFD700; font-size: 0.7rem; }
 
         .odds-section {
@@ -251,12 +262,12 @@
 <body>
 <div class="container">
     <div class="header">
-        <div class="logo"><h1>⚡ SOCCER BET</h1><div style="font-size:0.55rem;">Asian Handicap • Over/Under • SBOBET</div></div>
+        <div class="logo"><h1>⚡ LIVE SOCCER BET</h1><div style="font-size:0.55rem;">Real API • Live Scores</div></div>
         <div id="authSection"><div class="user-menu"><button class="menu-btn" id="showLoginBtn">Login</button><button class="menu-btn" id="showSignupBtn">Sign Up</button></div></div>
         <div id="userSection" style="display:none;"><div class="user-menu"><span class="username" id="usernameDisplay"></span><span class="balance-value" id="balanceDisplay">0</span><button class="menu-btn" id="depositBtn">💰</button><button class="menu-btn" id="withdrawBtn">💸</button><button class="menu-btn" id="logoutBtn">Exit</button></div></div>
     </div>
 
-    <div id="apiStatus" class="api-status">🔄 Loading matches from API...</div>
+    <div id="apiStatus" class="api-status">🔄 Loading live matches from API...</div>
 
     <div class="bet-mode-tabs">
         <button class="mode-tab active" data-mode="single">🎯 SINGLE BET</button>
@@ -264,8 +275,8 @@
     </div>
 
     <div class="sport-tabs">
-        <button class="sport-tab active" data-tab="today">📅 TODAY</button>
-        <button class="sport-tab" data-tab="tomorrow">⭐ TOMORROW</button>
+        <button class="sport-tab active" data-tab="live">🔴 LIVE</button>
+        <button class="sport-tab" data-tab="today">📅 TODAY</button>
     </div>
 
     <div id="matchesContainer"><div style="text-align:center; padding:40px;">Loading matches...</div></div>
@@ -276,6 +287,7 @@
     </div>
 </div>
 
+<!-- MODALS -->
 <div id="slipModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">📋 BET SLIP</div><div id="slipItemsList"></div><div style="margin:10px 0; padding:10px; background:#0a1a1a; border-radius:16px;"><div>Parlay Odds: <span id="totalOddsValue">0x</span></div><div>Stake: <input type="number" id="betStakeInput" value="10" min="5" style="width:100px; background:#0a1a1a; border:1px solid #FFD700; border-radius:20px; padding:5px; color:#00FF88;"></div><div>Potential Win: <span id="totalWinValue">0</span> USDT</div></div><button id="confirmBetBtn" class="btn-primary">CONFIRM</button><button id="clearSlipBtn" class="btn-primary" style="background:#2a2a2a;">Clear</button><button class="btn-primary" onclick="closeSlipModal()">Close</button></div></div>
 <div id="receiptModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">🎉 BET RECEIPT</div><div id="receiptContent"></div><button class="btn-primary" onclick="closeReceiptModal()">Close</button></div></div>
 <div id="historyModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">📜 HISTORY</div><div id="historyList"></div><button class="btn-primary" onclick="closeHistoryModal()">Close</button></div></div>
@@ -285,13 +297,18 @@
 
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
+// ============================================================
+// REAL API DATA - NO FAKE MATCHES
+// Uses your iSports API directly
+// ============================================================
+
 let token = localStorage.getItem('authToken');
 let currentUserId = null, currentBalance = 0, currentUsername = "";
 let betMode = "single";
 let singleBet = null;
 let parlayBets = [];
-let currentTab = "today";
-let matches = [];
+let currentTab = "live";
+let liveMatches = [];
 let userBets = [];
 
 const balanceDisplay = document.getElementById('balanceDisplay');
@@ -313,7 +330,7 @@ async function checkSession() {
             usernameDisplay.innerText = currentUsername;
             document.getElementById('authSection').style.display = 'none';
             document.getElementById('userSection').style.display = 'flex';
-            fetchMatches();
+            fetchLiveMatches();
             fetchUserBets();
             return true;
         } else { localStorage.removeItem('authToken'); token = null; return false; }
@@ -330,7 +347,7 @@ async function login(email, password) {
         usernameDisplay.innerText = currentUsername;
         document.getElementById('authSection').style.display = 'none';
         document.getElementById('userSection').style.display = 'flex';
-        closeAuthModal(); fetchMatches(); fetchUserBets();
+        closeAuthModal(); fetchLiveMatches(); fetchUserBets();
     } else { alert(data.error); }
 }
 
@@ -351,49 +368,43 @@ function logout() {
 }
 function updateSlipCount() { slipCount.innerText = betMode === "single" ? (singleBet ? 1 : 0) : parlayBets.length; }
 
-async function fetchMatches() {
+// ============================================================
+// FETCH REAL LIVE MATCHES FROM YOUR API
+// ============================================================
+async function fetchLiveMatches() {
     if (!currentUserId) return;
-    apiStatus.innerHTML = "🔄 Fetching matches from API...";
-    const date = currentTab === 'tomorrow' ? new Date(Date.now() + 86400000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    apiStatus.innerHTML = "🔄 Fetching live matches from API...";
     try {
-        const res = await fetch(`/api/upcoming-matches?date=${date}`);
+        const res = await fetch('/api/live-scores');
         const data = await res.json();
+        
+        console.log("API Response:", data);
+        
         if (!data || data.length === 0) {
-            apiStatus.innerHTML = "⚠️ No matches found for today";
-            matchesContainer.innerHTML = '<div style="text-align:center; padding:40px;">⚽ No matches scheduled</div>';
+            apiStatus.innerHTML = "⚠️ No live matches at the moment";
+            matchesContainer.innerHTML = '<div style="text-align:center; padding:40px;">⚽ No live matches right now</div>';
             return;
         }
-        matches = data;
-        apiStatus.innerHTML = `✅ ${matches.length} matches loaded`;
+        
+        liveMatches = data;
+        apiStatus.innerHTML = `✅ ${liveMatches.length} live matches`;
         renderMatches();
-        for (const match of matches) { fetchOddsForMatch(match.fixture_id); }
-    } catch(e) { apiStatus.innerHTML = "❌ Error loading matches"; }
-}
-
-async function fetchOddsForMatch(matchId) {
-    try {
-        const res = await fetch(`/api/match-odds/${matchId}?companyId=31`);
-        const data = await res.json();
-        if (data && data.data && data.data[0]) {
-            updateMatchOdds(matchId, data.data[0]);
-        }
-    } catch(e) {}
-}
-
-function updateMatchOdds(matchId, odds) {
-    const card = document.querySelector(`.match-card[data-id='${matchId}']`);
-    if (!card) return;
-    const home1x2 = card.querySelector('.odds-1x2-home');
-    const draw1x2 = card.querySelector('.odds-1x2-draw');
-    const away1x2 = card.querySelector('.odds-1x2-away');
-    if (home1x2) home1x2.innerText = odds.odds_home?.toFixed(2) || '2.00';
-    if (draw1x2) draw1x2.innerText = odds.odds_draw?.toFixed(2) || '3.20';
-    if (away1x2) away1x2.innerText = odds.odds_away?.toFixed(2) || '3.50';
+        
+    } catch(e) {
+        console.error("Error:", e);
+        apiStatus.innerHTML = "❌ Error loading matches";
+    }
 }
 
 function renderMatches() {
+    // Group by league
     const leagues = {};
-    matches.forEach(m => { if(!leagues[m.league_name]) leagues[m.league_name] = []; leagues[m.league_name].push(m); });
+    liveMatches.forEach(m => {
+        const leagueName = m.leagueName || "Football";
+        if (!leagues[leagueName]) leagues[leagueName] = [];
+        leagues[leagueName].push(m);
+    });
+    
     matchesContainer.innerHTML = Object.keys(leagues).map(league => `
         <div class="league-group">
             <div class="league-header" data-league="${league.replace(/ /g, '_')}">
@@ -402,33 +413,36 @@ function renderMatches() {
             </div>
             <div class="league-matches" id="league_${league.replace(/ /g, '_')}">
                 ${leagues[league].map(m => `
-                    <div class="match-card" data-id="${m.fixture_id}">
+                    <div class="match-card" data-id="${m.matchId}">
                         <div class="match-header">
-                            <span>📅 ${new Date(m.event_date).toLocaleString()}</span>
+                            <span class="match-status live">🔴 LIVE</span>
+                            <span>${new Date(m.matchTime * 1000).toLocaleTimeString()}</span>
                         </div>
                         <div class="match-teams">
                             <div class="match-team">
-                                <div class="match-team-name">${escapeHtml(m.home_team)}</div>
+                                <div class="match-team-name">${escapeHtml(m.homeName)}</div>
+                                <div class="match-score">${m.homeScore}</div>
                             </div>
                             <div class="match-vs">VS</div>
                             <div class="match-team">
-                                <div class="match-team-name">${escapeHtml(m.away_team)}</div>
+                                <div class="match-team-name">${escapeHtml(m.awayName)}</div>
+                                <div class="match-score">${m.awayScore}</div>
                             </div>
                         </div>
                         <div class="odds-section">
                             <div class="market-title">⚡ 1X2 (Moneyline)</div>
                             <div class="bet-row">
-                                <div class="bet-btn" data-match="${m.fixture_id}" data-type="1x2" data-selection="home" data-odds="2.00" data-name="${escapeHtml(m.home_team)}">
+                                <div class="bet-btn" data-match="${m.matchId}" data-type="1x2" data-selection="home" data-odds="2.00" data-name="${escapeHtml(m.homeName)}" data-home="${escapeHtml(m.homeName)}" data-away="${escapeHtml(m.awayName)}">
                                     <div class="bet-label">HOME</div>
-                                    <div class="bet-value odds-1x2-home">2.00</div>
+                                    <div class="bet-value">2.00</div>
                                 </div>
-                                <div class="bet-btn" data-match="${m.fixture_id}" data-type="1x2" data-selection="draw" data-odds="3.20" data-name="Draw">
+                                <div class="bet-btn" data-match="${m.matchId}" data-type="1x2" data-selection="draw" data-odds="3.20" data-name="Draw" data-home="${escapeHtml(m.homeName)}" data-away="${escapeHtml(m.awayName)}">
                                     <div class="bet-label">DRAW</div>
-                                    <div class="bet-value odds-1x2-draw">3.20</div>
+                                    <div class="bet-value">3.20</div>
                                 </div>
-                                <div class="bet-btn" data-match="${m.fixture_id}" data-type="1x2" data-selection="away" data-odds="3.50" data-name="${escapeHtml(m.away_team)}">
+                                <div class="bet-btn" data-match="${m.matchId}" data-type="1x2" data-selection="away" data-odds="3.50" data-name="${escapeHtml(m.awayName)}" data-home="${escapeHtml(m.homeName)}" data-away="${escapeHtml(m.awayName)}">
                                     <div class="bet-label">AWAY</div>
-                                    <div class="bet-value odds-1x2-away">3.50</div>
+                                    <div class="bet-value">3.50</div>
                                 </div>
                             </div>
                         </div>
@@ -437,21 +451,22 @@ function renderMatches() {
             </div>
         </div>
     `).join('');
+    
+    // Add click handlers for league headers
     document.querySelectorAll('.league-header').forEach(h => {
         h.addEventListener('click', () => {
             const id = h.dataset.league;
             const div = document.getElementById(`league_${id}`);
-            if(div) div.classList.toggle('collapsed');
+            if (div) div.classList.toggle('collapsed');
         });
     });
+    
+    // Add click handlers for bet buttons
     document.querySelectorAll('.bet-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const matchId = btn.dataset.match;
-            const match = matches.find(m => m.fixture_id == matchId);
-            if(!match) return;
-            const matchName = `${match.home_team} vs ${match.away_team}`;
-            const selection = btn.dataset.selection === 'home' ? match.home_team : (btn.dataset.selection === 'away' ? match.away_team : 'Draw');
+            const matchName = `${btn.dataset.home} vs ${btn.dataset.away}`;
+            const selection = btn.dataset.selection === 'home' ? btn.dataset.home : (btn.dataset.selection === 'away' ? btn.dataset.away : 'Draw');
             const odds = parseFloat(btn.dataset.odds);
             selectBet(matchName, selection, odds);
         });
@@ -465,8 +480,11 @@ function selectBet(matchName, selection, odds) {
         document.querySelectorAll('.bet-btn').forEach(btn => btn.style.background = '');
     } else {
         const exists = parlayBets.some(b => b.matchName === matchName && b.selection === selection);
-        if (exists) parlayBets = parlayBets.filter(b => !(b.matchName === matchName && b.selection === selection));
-        else parlayBets.push({ matchName, selection, odds });
+        if (exists) {
+            parlayBets = parlayBets.filter(b => !(b.matchName === matchName && b.selection === selection));
+        } else {
+            parlayBets.push({ matchName, selection, odds });
+        }
         updateSlipCount();
     }
 }
@@ -489,7 +507,7 @@ function openSlipModal() {
 
 async function placeBet() {
     let bets = betMode === "single" ? (singleBet ? [singleBet] : []) : parlayBets;
-    if (bets.length === 0) { alert("No bets"); return; }
+    if (bets.length === 0) { alert("No bets selected"); return; }
     const stake = parseFloat(document.getElementById('betStakeInput').value) || 10;
     if (stake > currentBalance) { alert("Insufficient balance"); return; }
     const totalOdds = bets.reduce((t, b) => t * b.odds, 1);
@@ -508,9 +526,13 @@ async function fetchUserBets() {
     const res = await fetch('/api/user-bets', { headers: { 'Authorization': `Bearer ${token}` } });
     const bets = await res.json();
     userBets = bets;
-    if (bets.length) document.getElementById('historyList').innerHTML = bets.slice().reverse().map(b => `<div style="background:#0a1a1a; border-radius:12px; padding:10px; margin-bottom:8px;"><div>${new Date(b.timestamp).toLocaleString()}</div><div>Stake: ${b.totalStake} USDT | Odds: ${b.totalOdds.toFixed(2)}x</div><div style="color:#FFA500;">Status: ${b.status || 'Pending'}</div></div>`).join('');
-    else document.getElementById('historyList').innerHTML = '<div style="text-align:center;">No bets yet</div>';
+    if (bets.length) {
+        document.getElementById('historyList').innerHTML = bets.slice().reverse().map(b => `<div style="background:#0a1a1a; border-radius:12px; padding:10px; margin-bottom:8px;"><div>${new Date(b.timestamp).toLocaleString()}</div><div>Stake: ${b.totalStake} USDT | Odds: ${b.totalOdds.toFixed(2)}x</div><div style="color:#FFA500;">Status: ${b.status || 'Pending'}</div></div>`).join('');
+    } else {
+        document.getElementById('historyList').innerHTML = '<div style="text-align:center;">No bets yet</div>';
+    }
 }
+
 function showHistory() { fetchUserBets(); document.getElementById('historyModal').style.display = 'flex'; }
 function closeSlipModal() { document.getElementById('slipModal').style.display = 'none'; }
 function closeReceiptModal() { document.getElementById('receiptModal').style.display = 'none'; }
@@ -525,15 +547,15 @@ document.getElementById('confirmBetBtn')?.addEventListener('click', placeBet);
 document.getElementById('clearSlipBtn')?.addEventListener('click', () => { singleBet = null; parlayBets = []; updateSlipCount(); });
 document.querySelectorAll('.mode-tab').forEach(tab => tab.addEventListener('click', () => {
     betMode = tab.dataset.mode;
-    document.querySelectorAll('.mode-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     singleBet = null; parlayBets = []; updateSlipCount();
 }));
 document.querySelectorAll('.sport-tab').forEach(tab => tab.addEventListener('click', () => {
     currentTab = tab.dataset.tab;
-    document.querySelectorAll('.sport-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.sport-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    fetchMatches();
+    if (currentTab === 'live') fetchLiveMatches();
 }));
 document.getElementById('showLoginBtn')?.addEventListener('click', () => { switchToLogin(); document.getElementById('authModal').style.display = 'flex'; });
 document.getElementById('showSignupBtn')?.addEventListener('click', () => { switchToSignup(); document.getElementById('authModal').style.display = 'flex'; });
@@ -557,7 +579,9 @@ let isLoginMode = true;
 function switchToLogin() { isLoginMode = true; document.getElementById('authTitle').innerText = 'Login'; document.getElementById('loginFields').style.display = 'block'; document.getElementById('signupFields').style.display = 'none'; }
 function switchToSignup() { isLoginMode = false; document.getElementById('authTitle').innerText = 'Sign Up'; document.getElementById('loginFields').style.display = 'none'; document.getElementById('signupFields').style.display = 'block'; }
 function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m=> m==='&'?'&amp;':(m==='<'?'&lt;':'&gt;')); }
+
 window.closeSlipModal = closeSlipModal; window.closeReceiptModal = closeReceiptModal; window.closeHistoryModal = closeHistoryModal; window.closeAuthModal = closeAuthModal; window.closeDepositModal = closeDepositModal; window.closeWithdrawModal = closeWithdrawModal;
+
 checkSession();
 </script>
 </body>
