@@ -12,8 +12,6 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || 'ADMIN_SECRET_123';
 const API_KEY = "y6qNrfP7R0qJUh1x";
 
 // TronGrid Configuration
-const TRONGRID_API = "https://api.trongrid.io";
-const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 const YOUR_WALLET = "TJBMedguebbWDtbVR9tYjBg3kb6NjMZWwg";
 
 app.use(express.json());
@@ -21,14 +19,13 @@ app.use(cors());
 app.use(express.static('public'));
 
 // ============================================================
-// DATABASE (In-Memory - Replace with PostgreSQL for production)
+// DATABASE (In-Memory)
 // ============================================================
 const users = [];
 const deposits = [];
 const withdrawals = [];
 const bets = [];
 const transactions = [];
-const referrals = [];
 
 let nextUserId = 1;
 let nextDepositId = 1;
@@ -36,15 +33,12 @@ let nextWithdrawalId = 1;
 let nextBetId = 1;
 let nextTxId = 1;
 
-// ============================================================
-// HELPER FUNCTIONS
-// ============================================================
 function generateReferralCode() {
     return 'REF_' + Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
 // ============================================================
-// USER REGISTRATION & LOGIN (with JWT & Referral)
+// USER REGISTRATION & LOGIN
 // ============================================================
 
 app.post('/api/register', async (req, res) => {
@@ -93,7 +87,6 @@ app.post('/api/register', async (req, res) => {
     
     users.push(newUser);
     
-    // Record signup bonus transaction
     transactions.push({
         id: nextTxId++,
         userId: newUser.id,
@@ -104,7 +97,6 @@ app.post('/api/register', async (req, res) => {
         timestamp: new Date().toISOString()
     });
     
-    // Generate JWT token
     const token = jwt.sign({ userId: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
     
     res.json({ 
@@ -151,7 +143,6 @@ app.post('/api/login', async (req, res) => {
     });
 });
 
-// Verify token middleware
 function verifyToken(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
@@ -185,106 +176,98 @@ app.get('/api/me', verifyToken, (req, res) => {
 });
 
 // ============================================================
-// REFERRAL SYSTEM
-// ============================================================
-
-app.get('/api/referral-stats', verifyToken, (req, res) => {
-    const user = users.find(u => u.id === req.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    
-    const referredUsers = users.filter(u => u.referredBy === user.id);
-    const totalReferrals = referredUsers.length;
-    const totalCommission = transactions
-        .filter(t => t.userId === user.id && t.type === 'referral_commission')
-        .reduce((sum, t) => sum + t.amount, 0);
-    
-    res.json({
-        referralCode: user.referralCode,
-        totalReferrals,
-        totalCommission,
-        referralLink: `https://go-f55z.onrender.com/?ref=${user.referralCode}`
-    });
-});
-
-// ============================================================
 // iSPORTS API PROXY - ALL ENDPOINTS
 // ============================================================
 
-// 1. Live Scores
-app.get('/api/livescores', async (req, res) => {
+// 1. Get upcoming fixtures (matches that haven't started)
+app.get('/api/upcoming-matches', async (req, res) => {
+    try {
+        const { date } = req.query;
+        const targetDate = date || new Date().toISOString().split('T')[0];
+        const url = `http://api.isportsapi.com/sport/football/fixtures?api_key=${API_KEY}&date=${targetDate}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        // Filter ONLY matches that haven't started (no scores, status not finished)
+        let matches = [];
+        if (data && data.data) {
+            matches = data.data.filter(match => 
+                match.status === 'notstarted' || 
+                match.status === 'scheduled' ||
+                (!match.home_score && !match.away_score)
+            );
+        }
+        
+        res.json(matches || []);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 2. Get ALL odds for a match (1X2, Asian Handicap, Over/Under)
+app.get('/api/match-odds/:matchId', async (req, res) => {
+    try {
+        const { matchId } = req.params;
+        const { companyId } = req.query;
+        const companies = companyId || '31,8,23'; // SBOBET, Bet365, 188bet
+        
+        const url = `http://api.isportsapi.com/sport/football/odds/all?api_key=${API_KEY}&matchId=${matchId}&companyId=${companies}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 3. Get 1X2 odds only (main market)
+app.get('/api/main-odds/:matchId', async (req, res) => {
+    try {
+        const { matchId } = req.params;
+        const { companyId } = req.query;
+        const companies = companyId || '31,8,23';
+        
+        const url = `http://api.isportsapi.com/sport/football/odds/main?api_key=${API_KEY}&matchId=${matchId}&companyId=${companies}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 4. Live scores (in-progress matches only)
+app.get('/api/live-scores', async (req, res) => {
     try {
         const url = `http://api.isportsapi.com/sport/football/livescores?api_key=${API_KEY}`;
         const response = await fetch(url);
         const data = await response.json();
-        res.json(data);
+        
+        // Filter only live matches (inprogress)
+        let liveMatches = [];
+        if (data && data.data) {
+            liveMatches = data.data.filter(match => 
+                match.status === 'inprogress' || match.status === 'live'
+            );
+        }
+        
+        res.json(liveMatches || []);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 2. Main Odds (1X2, Asian Handicap basics)
-app.get('/api/odds/main', async (req, res) => {
-    try {
-        const { matchId, companyId } = req.query;
-        let url = `http://api.isportsapi.com/sport/football/odds/main?api_key=${API_KEY}`;
-        
-        if (matchId) url += `&matchId=${matchId}`;
-        if (companyId) url += `&companyId=${companyId}`;
-        else url += `&companyId=31,8,23`; // SBOBET, Bet365, 188bet
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 3. All Odds (Asian Handicap, Over/Under, Correct Score)
-app.get('/api/odds/all', async (req, res) => {
-    try {
-        const { matchId, companyId } = req.query;
-        let url = `http://api.isportsapi.com/sport/football/odds/all?api_key=${API_KEY}`;
-        
-        if (matchId) url += `&matchId=${matchId}`;
-        if (companyId) url += `&companyId=${companyId}`;
-        else url += `&companyId=31,8,23`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 4. Live Odds Changes - Main (1 second polling)
-app.get('/api/odds/main/changes', async (req, res) => {
-    try {
-        const { matchId, companyId } = req.query;
-        let url = `http://api.isportsapi.com/sport/football/odds/main/changes?api_key=${API_KEY}`;
-        
-        if (matchId) url += `&matchId=${matchId}`;
-        if (companyId) url += `&companyId=${companyId}`;
-        else url += `&companyId=31,8,23`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 5. Live Odds Changes - All Markets (1 second polling)
-app.get('/api/odds/all/changes', async (req, res) => {
+// 5. Live odds changes (real-time polling)
+app.get('/api/odds-changes', async (req, res) => {
     try {
         const { matchId, companyId } = req.query;
         let url = `http://api.isportsapi.com/sport/football/odds/all/changes?api_key=${API_KEY}`;
         
         if (matchId) url += `&matchId=${matchId}`;
         if (companyId) url += `&companyId=${companyId}`;
-        else url += `&companyId=31,8,23`;
         
         const response = await fetch(url);
         const data = await response.json();
@@ -357,7 +340,7 @@ app.post('/api/tron-webhook', async (req, res) => {
     try {
         const { transaction_id, from, to, amount } = req.body;
         
-        if (to.toLowerCase() !== YOUR_WALLET.toLowerCase()) {
+        if (to && to.toLowerCase() !== YOUR_WALLET.toLowerCase()) {
             return res.status(200).json({ received: false, reason: 'Not my wallet' });
         }
         
@@ -366,10 +349,12 @@ app.post('/api/tron-webhook', async (req, res) => {
             return res.status(200).json({ received: true, already_processed: true });
         }
         
+        const depositAmount = amount ? parseFloat(amount) / 1e6 : 0;
+        
         const pendingDeposit = {
             id: nextDepositId++,
             userId: null,
-            amount: parseFloat(amount) / 1e6,
+            amount: depositAmount,
             txid: transaction_id,
             fromAddress: from,
             status: 'pending',
@@ -379,24 +364,23 @@ app.post('/api/tron-webhook', async (req, res) => {
         
         // Try to auto-assign by matching wallet address
         const user = users.find(u => u.walletAddress === from);
-        if (user) {
+        if (user && depositAmount > 0) {
             pendingDeposit.userId = user.id;
             pendingDeposit.status = 'completed';
-            user.balance += pendingDeposit.amount;
+            user.balance += depositAmount;
             
             transactions.push({
                 id: nextTxId++,
                 userId: user.id,
                 type: 'deposit',
-                amount: pendingDeposit.amount,
+                amount: depositAmount,
                 status: 'completed',
                 description: `Auto USDT Deposit - TXID: ${transaction_id}`,
                 timestamp: new Date().toISOString()
             });
         }
         
-        console.log(`💰 New USDT Deposit: ${amount} USDT from ${from}`);
-        console.log(`   TXID: ${transaction_id}`);
+        console.log(`💰 New USDT Deposit: ${depositAmount} USDT from ${from}`);
         console.log(`   Auto-assigned: ${user ? 'YES to ' + user.username : 'NO (pending)'}`);
         
         res.json({ received: true, auto_assigned: !!user });
@@ -608,7 +592,6 @@ app.get('/api/admin/users', (req, res) => {
         balance: u.balance,
         walletAddress: u.walletAddress,
         referralCode: u.referralCode,
-        referredBy: u.referredBy,
         createdAt: u.createdAt
     }));
     res.json(usersData);
@@ -647,14 +630,20 @@ app.get('/api/admin/stats', (req, res) => {
 // ============================================================
 
 app.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
-    console.log(`🔑 Admin secret: ${ADMIN_SECRET}`);
-    console.log(`💰 USDT Wallet: ${YOUR_WALLET}`);
-    console.log(`📡 API Endpoints available:`);
-    console.log(`   - /api/livescores`);
-    console.log(`   - /api/odds/main`);
-    console.log(`   - /api/odds/all`);
-    console.log(`   - /api/odds/main/changes`);
-    console.log(`   - /api/odds/all/changes`);
-    console.log(`📡 TronGrid webhook: https://your-app.onrender.com/api/tron-webhook`);
+    console.log(`
+╔══════════════════════════════════════════════════════════════╗
+║     ✅ SOCCER BET SERVER RUNNING                            ║
+╠══════════════════════════════════════════════════════════════╣
+║                                                              ║
+║   📡 Endpoints available:                                   ║
+║   - GET  /api/upcoming-matches   (upcoming fixtures)        ║
+║   - GET  /api/match-odds/:id     (all odds - Handicap/O/U)  ║
+║   - GET  /api/main-odds/:id      (1X2 only)                 ║
+║   - GET  /api/live-scores        (live matches)             ║
+║   - GET  /api/odds-changes       (real-time changes)        ║
+║                                                              ║
+║   💰 USDT Wallet: ${YOUR_WALLET}                              ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+    `);
 });
