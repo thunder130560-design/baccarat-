@@ -19,6 +19,30 @@ app.use(cors());
 app.use(express.static('public'));
 
 // ============================================================
+// DEMO MATCHES (When API has no real matches)
+// ============================================================
+const DEMO_MATCHES = [
+    { fixture_id: 1001, league_name: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League", home_team: "Manchester City", away_team: "Arsenal", event_date: new Date(Date.now() + 3600000).toISOString(), status: "notstarted" },
+    { fixture_id: 1002, league_name: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League", home_team: "Liverpool", away_team: "Chelsea", event_date: new Date(Date.now() + 7200000).toISOString(), status: "notstarted" },
+    { fixture_id: 1003, league_name: "🇪🇸 La Liga", home_team: "Real Madrid", away_team: "Barcelona", event_date: new Date(Date.now() + 10800000).toISOString(), status: "notstarted" },
+    { fixture_id: 1004, league_name: "🇩🇪 Bundesliga", home_team: "Bayern Munich", away_team: "Borussia Dortmund", event_date: new Date(Date.now() + 14400000).toISOString(), status: "notstarted" },
+    { fixture_id: 1005, league_name: "🇮🇹 Serie A", home_team: "Inter Milan", away_team: "AC Milan", event_date: new Date(Date.now() + 18000000).toISOString(), status: "notstarted" },
+    { fixture_id: 1006, league_name: "🇫🇷 Ligue 1", home_team: "PSG", away_team: "Marseille", event_date: new Date(Date.now() + 21600000).toISOString(), status: "notstarted" },
+    { fixture_id: 1007, league_name: "🏆 Champions League", home_team: "Real Madrid", away_team: "Bayern Munich", event_date: new Date(Date.now() + 86400000).toISOString(), status: "notstarted" }
+];
+
+// Demo odds for matches
+const DEMO_ODDS = {
+    1001: { odds_home: 1.85, odds_draw: 3.60, odds_away: 4.20 },
+    1002: { odds_home: 1.90, odds_draw: 3.50, odds_away: 4.00 },
+    1003: { odds_home: 2.20, odds_draw: 3.50, odds_away: 3.20 },
+    1004: { odds_home: 1.75, odds_draw: 4.00, odds_away: 4.50 },
+    1005: { odds_home: 2.30, odds_draw: 3.30, odds_away: 3.10 },
+    1006: { odds_home: 1.55, odds_draw: 4.20, odds_away: 6.00 },
+    1007: { odds_home: 2.10, odds_draw: 3.40, odds_away: 3.50 }
+};
+
+// ============================================================
 // DATABASE (In-Memory)
 // ============================================================
 const users = [];
@@ -42,7 +66,7 @@ function generateReferralCode() {
 // ============================================================
 
 app.post('/api/register', async (req, res) => {
-    const { username, email, password, confirmPassword, referralCode, walletAddress } = req.body;
+    const { username, email, password, confirmPassword, referralCode } = req.body;
     
     if (!username || !email || !password || !confirmPassword) {
         return res.status(400).json({ error: 'All fields required' });
@@ -80,7 +104,7 @@ app.post('/api/register', async (req, res) => {
         balance: 1000,
         referralCode: newReferralCode,
         referredBy,
-        walletAddress: walletAddress || null,
+        walletAddress: null,
         createdAt: new Date().toISOString(),
         isAdmin: email === 'admin@example.com'
     };
@@ -107,8 +131,7 @@ app.post('/api/register', async (req, res) => {
             username: newUser.username, 
             email: newUser.email, 
             balance: newUser.balance,
-            referralCode: newUser.referralCode,
-            walletAddress: newUser.walletAddress
+            referralCode: newUser.referralCode
         }
     });
 });
@@ -137,7 +160,6 @@ app.post('/api/login', async (req, res) => {
             email: user.email, 
             balance: user.balance,
             referralCode: user.referralCode,
-            walletAddress: user.walletAddress,
             isAdmin: user.isAdmin || false
         }
     });
@@ -170,16 +192,37 @@ app.get('/api/me', verifyToken, (req, res) => {
         email: user.email, 
         balance: user.balance,
         referralCode: user.referralCode,
-        walletAddress: user.walletAddress,
         isAdmin: user.isAdmin || false
     });
 });
 
 // ============================================================
-// iSPORTS API PROXY - ALL ENDPOINTS
+// REFERRAL STATS
 // ============================================================
 
-// 1. Get upcoming fixtures (matches that haven't started)
+app.get('/api/referral-stats', verifyToken, (req, res) => {
+    const user = users.find(u => u.id === req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const referredUsers = users.filter(u => u.referredBy === user.id);
+    const totalReferrals = referredUsers.length;
+    const totalCommission = transactions
+        .filter(t => t.userId === user.id && t.type === 'referral_commission')
+        .reduce((sum, t) => sum + t.amount, 0);
+    
+    res.json({
+        referralCode: user.referralCode,
+        totalReferrals,
+        totalCommission,
+        referralLink: `https://go-f55z.onrender.com/?ref=${user.referralCode}`
+    });
+});
+
+// ============================================================
+// iSPORTS API PROXY (WITH DEMO FALLBACK)
+// ============================================================
+
+// 1. Get upcoming matches (with demo fallback)
 app.get('/api/upcoming-matches', async (req, res) => {
     try {
         const { date } = req.query;
@@ -189,91 +232,53 @@ app.get('/api/upcoming-matches', async (req, res) => {
         const response = await fetch(url);
         const data = await response.json();
         
-        // Filter ONLY matches that haven't started (no scores, status not finished)
+        // Filter only matches that haven't started
         let matches = [];
-        if (data && data.data) {
+        if (data && data.data && data.data.length > 0) {
             matches = data.data.filter(match => 
-                match.status === 'notstarted' || 
-                match.status === 'scheduled' ||
-                (!match.home_score && !match.away_score)
+                match.status === 'notstarted' || match.status === 'scheduled'
             );
         }
         
-        res.json(matches || []);
+        // If API returns no matches, use demo data
+        if (!matches || matches.length === 0) {
+            return res.json(DEMO_MATCHES);
+        }
+        
+        res.json(matches);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        // If API fails, return demo data
+        res.json(DEMO_MATCHES);
     }
 });
 
-// 2. Get ALL odds for a match (1X2, Asian Handicap, Over/Under)
+// 2. Get ALL odds for a match (with demo fallback)
 app.get('/api/match-odds/:matchId', async (req, res) => {
-    try {
-        const { matchId } = req.params;
-        const { companyId } = req.query;
-        const companies = companyId || '31,8,23'; // SBOBET, Bet365, 188bet
-        
-        const url = `http://api.isportsapi.com/sport/football/odds/all?api_key=${API_KEY}&matchId=${matchId}&companyId=${companies}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 3. Get 1X2 odds only (main market)
-app.get('/api/main-odds/:matchId', async (req, res) => {
     try {
         const { matchId } = req.params;
         const { companyId } = req.query;
         const companies = companyId || '31,8,23';
         
-        const url = `http://api.isportsapi.com/sport/football/odds/main?api_key=${API_KEY}&matchId=${matchId}&companyId=${companies}`;
+        const url = `http://api.isportsapi.com/sport/football/odds/all?api_key=${API_KEY}&matchId=${matchId}&companyId=${companies}`;
         const response = await fetch(url);
         const data = await response.json();
         
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 4. Live scores (in-progress matches only)
-app.get('/api/live-scores', async (req, res) => {
-    try {
-        const url = `http://api.isportsapi.com/sport/football/livescores?api_key=${API_KEY}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        // Filter only live matches (inprogress)
-        let liveMatches = [];
-        if (data && data.data) {
-            liveMatches = data.data.filter(match => 
-                match.status === 'inprogress' || match.status === 'live'
-            );
+        // If API fails or returns empty, use demo odds
+        if (!data || !data.data || data.data.length === 0) {
+            if (DEMO_ODDS[matchId]) {
+                return res.json({ data: [{ ...DEMO_ODDS[matchId], matchId }] });
+            }
+            // Default odds
+            return res.json({ data: [{ odds_home: 2.00, odds_draw: 3.20, odds_away: 3.50, matchId }] });
         }
         
-        res.json(liveMatches || []);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 5. Live odds changes (real-time polling)
-app.get('/api/odds-changes', async (req, res) => {
-    try {
-        const { matchId, companyId } = req.query;
-        let url = `http://api.isportsapi.com/sport/football/odds/all/changes?api_key=${API_KEY}`;
-        
-        if (matchId) url += `&matchId=${matchId}`;
-        if (companyId) url += `&companyId=${companyId}`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        // Return demo odds on error
+        if (DEMO_ODDS[matchId]) {
+            return res.json({ data: [{ ...DEMO_ODDS[matchId], matchId }] });
+        }
+        res.json({ data: [{ odds_home: 2.00, odds_draw: 3.20, odds_away: 3.50, matchId: parseInt(matchId) }] });
     }
 });
 
@@ -295,6 +300,7 @@ app.post('/api/manual-deposit', (req, res) => {
     
     user.balance += amount;
     
+    // Give referral commission (10% of deposit)
     if (user.referredBy) {
         const referrer = users.find(u => u.id === user.referredBy);
         if (referrer) {
@@ -335,7 +341,6 @@ app.post('/api/manual-deposit', (req, res) => {
     res.json({ success: true, newBalance: user.balance });
 });
 
-// TronGrid Webhook for auto deposit
 app.post('/api/tron-webhook', async (req, res) => {
     try {
         const { transaction_id, from, to, amount } = req.body;
@@ -379,9 +384,6 @@ app.post('/api/tron-webhook', async (req, res) => {
                 timestamp: new Date().toISOString()
             });
         }
-        
-        console.log(`💰 New USDT Deposit: ${depositAmount} USDT from ${from}`);
-        console.log(`   Auto-assigned: ${user ? 'YES to ' + user.username : 'NO (pending)'}`);
         
         res.json({ received: true, auto_assigned: !!user });
         
@@ -590,7 +592,6 @@ app.get('/api/admin/users', (req, res) => {
         username: u.username,
         email: u.email,
         balance: u.balance,
-        walletAddress: u.walletAddress,
         referralCode: u.referralCode,
         createdAt: u.createdAt
     }));
@@ -632,17 +633,15 @@ app.get('/api/admin/stats', (req, res) => {
 app.listen(PORT, () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║     ✅ SOCCER BET SERVER RUNNING                            ║
+║     ✅ 5D SOCCER BET SERVER RUNNING                         ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║   📡 Endpoints available:                                   ║
 ║   - GET  /api/upcoming-matches   (upcoming fixtures)        ║
-║   - GET  /api/match-odds/:id     (all odds - Handicap/O/U)  ║
-║   - GET  /api/main-odds/:id      (1X2 only)                 ║
-║   - GET  /api/live-scores        (live matches)             ║
-║   - GET  /api/odds-changes       (real-time changes)        ║
+║   - GET  /api/match-odds/:id     (all odds)                 ║
 ║                                                              ║
 ║   💰 USDT Wallet: ${YOUR_WALLET}                              ║
+║   🎯 Demo matches loaded (7 matches)                        ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
     `);
