@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>⚡ SOCCER BET | Live & Upcoming Matches</title>
+    <title>⚡ SOCCER BET | Live Odds | Handicap | Over/Under</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
         body { background: linear-gradient(135deg, #0a2a1f 0%, #0b3b25 100%); min-height: 100vh; padding: 15px; padding-bottom: 100px; }
@@ -27,15 +27,14 @@
         .match-header { display: flex; justify-content: space-between; margin-bottom: 10px; color: #FFD700; font-size: 0.7rem; }
         .match-status { background: #ff4444; padding: 2px 8px; border-radius: 20px; font-size: 0.6rem; color: white; }
         .match-status.upcoming { background: #FFA500; }
-        .match-status.live { background: #ff4444; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
         .match-teams { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
         .match-team { flex: 1; text-align: center; }
         .match-team-name { font-weight: bold; color: #FFFFFF; font-size: 0.85rem; }
         .match-score { font-size: 1.2rem; font-weight: bold; color: #00FF88; margin-top: 4px; }
         .match-vs { color: #FFD700; font-size: 0.7rem; }
-        .bet-row { display: flex; gap: 8px; margin-top: 10px; }
-        .bet-btn { flex: 1; background: rgba(0,0,0,0.5); border: 1px solid #FFD70040; border-radius: 12px; padding: 8px 4px; text-align: center; cursor: pointer; }
+        .market-title { font-size: 0.65rem; color: #FFA500; margin: 8px 0 5px; padding-left: 5px; }
+        .bet-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+        .bet-btn { flex: 1; min-width: 80px; background: rgba(0,0,0,0.5); border: 1px solid #FFD70040; border-radius: 12px; padding: 8px 4px; text-align: center; cursor: pointer; }
         .bet-btn:active { background: #FFD700; transform: scale(0.97); }
         .bet-label { font-size: 0.6rem; color: #FFD700; }
         .bet-value { font-size: 0.9rem; font-weight: bold; color: #00FF88; }
@@ -53,7 +52,7 @@
 <body>
 <div class="container">
     <div class="header">
-        <div class="logo"><h1>⚡ SOCCER BET</h1><div style="font-size:0.55rem;">Live & Upcoming Matches</div></div>
+        <div class="logo"><h1>⚡ SOCCER BET</h1><div style="font-size:0.55rem;">1X2 • Asian Handicap • Over/Under</div></div>
         <div id="authSection"><div class="user-menu"><button class="menu-btn" id="showLoginBtn">Login</button><button class="menu-btn" id="showSignupBtn">Sign Up</button></div></div>
         <div id="userSection" style="display:none;"><div class="user-menu"><span class="username" id="usernameDisplay"></span><span class="balance-value" id="balanceDisplay">0</span><button class="menu-btn" id="depositBtn">💰</button><button class="menu-btn" id="withdrawBtn">💸</button><button class="menu-btn" id="logoutBtn">Exit</button></div></div>
     </div>
@@ -78,7 +77,7 @@
     </div>
 </div>
 
-<!-- MODALS (same as before) -->
+<!-- MODALS -->
 <div id="slipModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">📋 BET SLIP</div><div id="slipItemsList"></div><div style="margin:10px 0; padding:10px; background:#0a1a1a; border-radius:16px;"><div>Parlay Odds: <span id="totalOddsValue">0x</span></div><div>Stake: <input type="number" id="betStakeInput" value="10" min="5" style="width:100px; background:#0a1a1a; border:1px solid #FFD700; border-radius:20px; padding:5px; color:#00FF88;"></div><div>Potential Win: <span id="totalWinValue">0</span> USDT</div></div><button id="confirmBetBtn" class="btn-primary">CONFIRM</button><button id="clearSlipBtn" class="btn-primary" style="background:#2a2a2a;">Clear</button><button class="btn-primary" onclick="closeSlipModal()">Close</button></div></div>
 <div id="receiptModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">🎉 BET RECEIPT</div><div id="receiptContent"></div><button class="btn-primary" onclick="closeReceiptModal()">Close</button></div></div>
 <div id="historyModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">📜 HISTORY</div><div id="historyList"></div><button class="btn-primary" onclick="closeHistoryModal()">Close</button></div></div>
@@ -155,7 +154,6 @@ function logout() {
 }
 function updateSlipCount() { slipCount.innerText = betMode === "single" ? (singleBet ? 1 : 0) : parlayBets.length; }
 
-// LIVE MATCHES (with scores)
 async function fetchLiveMatches() {
     if (!currentUserId) return;
     apiStatus.innerHTML = "🔄 Fetching live matches...";
@@ -174,7 +172,6 @@ async function fetchLiveMatches() {
     } catch(e) { apiStatus.innerHTML = "❌ Error loading matches"; }
 }
 
-// UPCOMING MATCHES (no scores, haven't started)
 async function fetchUpcomingMatches() {
     if (!currentUserId) return;
     apiStatus.innerHTML = "🔄 Fetching upcoming matches...";
@@ -186,10 +183,21 @@ async function fetchUpcomingMatches() {
             apiStatus.innerHTML = `✅ ${upcomingMatches.length} upcoming matches`;
         } else {
             upcomingMatches = [];
-            apiStatus.innerHTML = "⚠️ No upcoming matches today";
+            apiStatus.innerHTML = "⚠️ No upcoming matches";
         }
         if (currentTab === 'today') renderUpcomingMatches();
     } catch(e) { apiStatus.innerHTML = "❌ Error loading upcoming matches"; }
+}
+
+async function fetchOddsForMatch(matchId) {
+    try {
+        const res = await fetch(`/api/match-odds/${matchId}?companyId=31`);
+        const data = await res.json();
+        if (data && data.data && data.data[0]) {
+            return data.data[0];
+        }
+        return null;
+    } catch(e) { return null; }
 }
 
 function renderLiveMatches() {
@@ -207,17 +215,18 @@ function renderLiveMatches() {
             </div>
             <div class="league-matches" id="league_${league.replace(/ /g, '_')}">
                 ${leagues[league].map(m => `
-                    <div class="match-card">
+                    <div class="match-card" data-id="${m.matchId}">
                         <div class="match-header"><span class="match-status live">🔴 LIVE</span><span>${new Date(m.matchTime * 1000).toLocaleTimeString()}</span></div>
                         <div class="match-teams">
                             <div class="match-team"><div class="match-team-name">${escapeHtml(m.homeName)}</div><div class="match-score">${m.homeScore}</div></div>
                             <div class="match-vs">VS</div>
                             <div class="match-team"><div class="match-team-name">${escapeHtml(m.awayName)}</div><div class="match-score">${m.awayScore}</div></div>
                         </div>
+                        <div class="market-title">⚡ 1X2 (Moneyline)</div>
                         <div class="bet-row">
-                            <div class="bet-btn" data-match="${m.matchId}" data-type="1x2" data-selection="home" data-odds="2.00" data-name="${escapeHtml(m.homeName)}" data-home="${escapeHtml(m.homeName)}" data-away="${escapeHtml(m.awayName)}"><div class="bet-label">HOME</div><div class="bet-value">2.00</div></div>
-                            <div class="bet-btn" data-match="${m.matchId}" data-type="1x2" data-selection="draw" data-odds="3.20" data-name="Draw" data-home="${escapeHtml(m.homeName)}" data-away="${escapeHtml(m.awayName)}"><div class="bet-label">DRAW</div><div class="bet-value">3.20</div></div>
-                            <div class="bet-btn" data-match="${m.matchId}" data-type="1x2" data-selection="away" data-odds="3.50" data-name="${escapeHtml(m.awayName)}" data-home="${escapeHtml(m.homeName)}" data-away="${escapeHtml(m.awayName)}"><div class="bet-label">AWAY</div><div class="bet-value">3.50</div></div>
+                            <div class="bet-btn" data-match="${m.matchId}" data-selection="home" data-odds="2.00" data-name="${escapeHtml(m.homeName)}" data-home="${escapeHtml(m.homeName)}" data-away="${escapeHtml(m.awayName)}"><div class="bet-label">HOME</div><div class="bet-value odds-home">2.00</div></div>
+                            <div class="bet-btn" data-match="${m.matchId}" data-selection="draw" data-odds="3.20" data-name="Draw" data-home="${escapeHtml(m.homeName)}" data-away="${escapeHtml(m.awayName)}"><div class="bet-label">DRAW</div><div class="bet-value odds-draw">3.20</div></div>
+                            <div class="bet-btn" data-match="${m.matchId}" data-selection="away" data-odds="3.50" data-name="${escapeHtml(m.awayName)}" data-home="${escapeHtml(m.homeName)}" data-away="${escapeHtml(m.awayName)}"><div class="bet-label">AWAY</div><div class="bet-value odds-away">3.50</div></div>
                         </div>
                     </div>
                 `).join('')}
@@ -225,6 +234,7 @@ function renderLiveMatches() {
         </div>
     `).join('');
     attachClickHandlers();
+    fetchAllOdds();
 }
 
 function renderUpcomingMatches() {
@@ -242,17 +252,26 @@ function renderUpcomingMatches() {
             </div>
             <div class="league-matches" id="league_${league.replace(/ /g, '_')}">
                 ${leagues[league].map(m => `
-                    <div class="match-card">
+                    <div class="match-card" data-id="${m.fixture_id}">
                         <div class="match-header"><span class="match-status upcoming">📅 UPCOMING</span><span>${new Date(m.event_date).toLocaleTimeString()}</span></div>
                         <div class="match-teams">
                             <div class="match-team"><div class="match-team-name">${escapeHtml(m.home_team)}</div><div class="match-score">-</div></div>
                             <div class="match-vs">VS</div>
                             <div class="match-team"><div class="match-team-name">${escapeHtml(m.away_team)}</div><div class="match-score">-</div></div>
                         </div>
+                        <div class="market-title">⚡ 1X2 (Moneyline)</div>
                         <div class="bet-row">
-                            <div class="bet-btn" data-match="${m.fixture_id}" data-type="1x2" data-selection="home" data-odds="2.00" data-name="${escapeHtml(m.home_team)}" data-home="${escapeHtml(m.home_team)}" data-away="${escapeHtml(m.away_team)}"><div class="bet-label">HOME</div><div class="bet-value">2.00</div></div>
-                            <div class="bet-btn" data-match="${m.fixture_id}" data-type="1x2" data-selection="draw" data-odds="3.20" data-name="Draw" data-home="${escapeHtml(m.home_team)}" data-away="${escapeHtml(m.away_team)}"><div class="bet-label">DRAW</div><div class="bet-value">3.20</div></div>
-                            <div class="bet-btn" data-match="${m.fixture_id}" data-type="1x2" data-selection="away" data-odds="3.50" data-name="${escapeHtml(m.away_team)}" data-home="${escapeHtml(m.home_team)}" data-away="${escapeHtml(m.away_team)}"><div class="bet-label">AWAY</div><div class="bet-value">3.50</div></div>
+                            <div class="bet-btn" data-match="${m.fixture_id}" data-selection="home" data-odds="2.00" data-name="${escapeHtml(m.home_team)}" data-home="${escapeHtml(m.home_team)}" data-away="${escapeHtml(m.away_team)}"><div class="bet-label">HOME</div><div class="bet-value odds-home">2.00</div></div>
+                            <div class="bet-btn" data-match="${m.fixture_id}" data-selection="draw" data-odds="3.20" data-name="Draw" data-home="${escapeHtml(m.home_team)}" data-away="${escapeHtml(m.away_team)}"><div class="bet-label">DRAW</div><div class="bet-value odds-draw">3.20</div></div>
+                            <div class="bet-btn" data-match="${m.fixture_id}" data-selection="away" data-odds="3.50" data-name="${escapeHtml(m.away_team)}" data-home="${escapeHtml(m.home_team)}" data-away="${escapeHtml(m.away_team)}"><div class="bet-label">AWAY</div><div class="bet-value odds-away">3.50</div></div>
+                        </div>
+                        <div class="market-title">⚽ Asian Handicap</div>
+                        <div class="bet-row" id="handicap-row-${m.fixture_id}">
+                            <div class="bet-btn" style="flex:1"><div class="bet-label">Loading...</div></div>
+                        </div>
+                        <div class="market-title">📊 Over/Under</div>
+                        <div class="bet-row" id="overunder-row-${m.fixture_id}">
+                            <div class="bet-btn" style="flex:1"><div class="bet-label">Loading...</div></div>
                         </div>
                     </div>
                 `).join('')}
@@ -260,6 +279,65 @@ function renderUpcomingMatches() {
         </div>
     `).join('');
     attachClickHandlers();
+    fetchAllOdds();
+}
+
+async function fetchAllOdds() {
+    const matchCards = document.querySelectorAll('.match-card');
+    for (const card of matchCards) {
+        const matchId = card.dataset.id;
+        if (matchId) {
+            const odds = await fetchOddsForMatch(matchId);
+            if (odds) {
+                updateMatchOdds(card, odds);
+            }
+        }
+    }
+}
+
+function updateMatchOdds(card, odds) {
+    const homeOdds = card.querySelector('.odds-home');
+    const drawOdds = card.querySelector('.odds-draw');
+    const awayOdds = card.querySelector('.odds-away');
+    if (homeOdds) homeOdds.innerText = odds.odds_home?.toFixed(2) || '2.00';
+    if (drawOdds) drawOdds.innerText = odds.odds_draw?.toFixed(2) || '3.20';
+    if (awayOdds) awayOdds.innerText = odds.odds_away?.toFixed(2) || '3.50';
+    
+    const matchId = card.dataset.id;
+    
+    // Asian Handicap
+    if (odds.asian_handicap && odds.asian_handicap.length > 0) {
+        const handicapRow = document.getElementById(`handicap-row-${matchId}`);
+        if (handicapRow) {
+            handicapRow.innerHTML = odds.asian_handicap.slice(0, 3).map(h => `
+                <div class="bet-btn" data-match="${matchId}" data-selection="home_handicap" data-odds="${h.home}" data-handicap="${h.line}">
+                    <div class="bet-label">${h.line}</div>
+                    <div class="bet-value">${h.home.toFixed(2)}</div>
+                </div>
+                <div class="bet-btn" data-match="${matchId}" data-selection="away_handicap" data-odds="${h.away}" data-handicap="${h.line}">
+                    <div class="bet-label">${h.line}</div>
+                    <div class="bet-value">${h.away.toFixed(2)}</div>
+                </div>
+            `).join('');
+        }
+    }
+    
+    // Over/Under
+    if (odds.over_under && odds.over_under.length > 0) {
+        const overRow = document.getElementById(`overunder-row-${matchId}`);
+        if (overRow) {
+            overRow.innerHTML = odds.over_under.slice(0, 3).map(ou => `
+                <div class="bet-btn" data-match="${matchId}" data-selection="over" data-odds="${ou.over}">
+                    <div class="bet-label">Over ${ou.line}</div>
+                    <div class="bet-value">${ou.over.toFixed(2)}</div>
+                </div>
+                <div class="bet-btn" data-match="${matchId}" data-selection="under" data-odds="${ou.under}">
+                    <div class="bet-label">Under ${ou.line}</div>
+                    <div class="bet-value">${ou.under.toFixed(2)}</div>
+                </div>
+            `).join('');
+        }
+    }
 }
 
 function attachClickHandlers() {
@@ -274,9 +352,17 @@ function attachClickHandlers() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const matchName = `${btn.dataset.home} vs ${btn.dataset.away}`;
-            const selection = btn.dataset.selection === 'home' ? btn.dataset.home : (btn.dataset.selection === 'away' ? btn.dataset.away : 'Draw');
-            const odds = parseFloat(btn.dataset.odds);
-            selectBet(matchName, selection, odds);
+            let selection = btn.dataset.selection;
+            let odds = parseFloat(btn.dataset.odds);
+            let displayName = selection;
+            if (selection === 'home') displayName = btn.dataset.home;
+            if (selection === 'away') displayName = btn.dataset.away;
+            if (selection === 'draw') displayName = 'Draw';
+            if (selection === 'home_handicap') displayName = `${btn.dataset.home} ${btn.dataset.handicap}`;
+            if (selection === 'away_handicap') displayName = `${btn.dataset.away} ${btn.dataset.handicap}`;
+            if (selection === 'over') displayName = `Over ${btn.dataset.line || ''}`;
+            if (selection === 'under') displayName = `Under ${btn.dataset.line || ''}`;
+            selectBet(matchName, displayName, odds);
         });
     });
 }
