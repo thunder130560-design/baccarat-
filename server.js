@@ -170,16 +170,15 @@ app.get('/api/me', verifyToken, (req, res) => {
 });
 
 // ============================================================
-// iSPORTS API - LIVE SCORES (matches with scores)
+// iSPORTS API - ALL ODDS ENDPOINTS (1X2, HANDICAP, OVER/UNDER)
 // ============================================================
 
+// Get live scores
 app.get('/api/live-scores', async (req, res) => {
     try {
         const url = `http://api.isportsapi.com/sport/football/livescores?api_key=${API_KEY}`;
         const response = await fetch(url);
         const data = await response.json();
-        
-        console.log("Live scores fetched:", data.data ? data.data.length : 0, "matches");
         
         if (data && data.data) {
             res.json(data.data);
@@ -192,18 +191,13 @@ app.get('/api/live-scores', async (req, res) => {
     }
 });
 
-// ============================================================
-// iSPORTS API - UPCOMING MATCHES (no scores, haven't started)
-// ============================================================
-
+// Get upcoming fixtures
 app.get('/api/upcoming-matches', async (req, res) => {
     try {
         const today = new Date().toISOString().split('T')[0];
         const url = `http://api.isportsapi.com/sport/football/fixtures?api_key=${API_KEY}&date=${today}`;
         const response = await fetch(url);
         const data = await response.json();
-        
-        console.log("Upcoming matches fetched:", data.data ? data.data.length : 0, "fixtures");
         
         if (data && data.data) {
             const upcoming = data.data.filter(m => m.status === 'notstarted' || m.status === 'scheduled');
@@ -217,19 +211,34 @@ app.get('/api/upcoming-matches', async (req, res) => {
     }
 });
 
-// ============================================================
-// iSPORTS API - ODDS FOR A MATCH
-// ============================================================
-
+// Get ALL odds for a match (1X2, Asian Handicap, Over/Under)
 app.get('/api/match-odds/:matchId', async (req, res) => {
     try {
         const { matchId } = req.params;
-        const url = `http://api.isportsapi.com/sport/football/odds/all?api_key=${API_KEY}&matchId=${matchId}&companyId=31`;
+        const { companyId } = req.query;
+        const companies = companyId || '31,8,23';
+        
+        const url = `http://api.isportsapi.com/sport/football/odds/all?api_key=${API_KEY}&matchId=${matchId}&companyId=${companies}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        res.json(data);
+    } catch (error) {
+        console.error("Error fetching odds:", error);
+        res.json({ data: [] });
+    }
+});
+
+// Get 1X2 odds only
+app.get('/api/main-odds/:matchId', async (req, res) => {
+    try {
+        const { matchId } = req.params;
+        const url = `http://api.isportsapi.com/sport/football/odds/main?api_key=${API_KEY}&matchId=${matchId}&companyId=31`;
         const response = await fetch(url);
         const data = await response.json();
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.json({ data: [] });
     }
 });
 
@@ -578,9 +587,9 @@ app.listen(PORT, () => {
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║   📡 Endpoints:                                             ║
-║   - GET /api/live-scores     (live matches with scores)     ║
-║   - GET /api/upcoming-matches (upcoming matches, no scores) ║
-║   - GET /api/match-odds/:id   (odds for a match)            ║
+║   - GET /api/live-scores                                    ║
+║   - GET /api/upcoming-matches                               ║
+║   - GET /api/match-odds/:id  (1X2 + Handicap + Over/Under) ║
 ║                                                              ║
 ║   💰 USDT Wallet: ${YOUR_WALLET}                              ║
 ║                                                              ║
